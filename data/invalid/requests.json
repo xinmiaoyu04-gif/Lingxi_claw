@@ -1,0 +1,12 @@
+{
+  "create_dataset_empty": {},
+  "create_dataset_blank_name": {"name": "", "course": "高等数学"},
+  "create_dataset_blank_course": {"name": "高等数学期末突击", "course": ""},
+  "plan_invalid_date": {"exam_date": "not-a-date", "daily_study_hours": 4},
+  "plan_past_date": {"exam_date": "2020-01-01", "daily_study_hours": 4},
+  "plan_zero_hours": {"exam_date": "2026-08-30", "daily_study_hours": 0},
+  "practice_invalid_difficulty": {"knowledge_points": ["二重积分"], "question_count": 5, "difficulty": "impossible"},
+  "practice_zero_questions": {"knowledge_points": ["二重积分"], "question_count": 0, "difficulty": "medium"},
+  "chat_empty_message": {"message": ""},
+  "settings_invalid_policy": {"response_style": "verbose", "personality": "encouraging", "answer_policy": "answer_everything"}
+}
