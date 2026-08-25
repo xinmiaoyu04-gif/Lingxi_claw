@@ -1,0 +1,31 @@
+{
+  "dataset": {
+    "dataset_id": "ds_001",
+    "name": "高等数学期末突击",
+    "course": "高等数学",
+    "file_count": 4,
+    "status": "ready",
+    "created_at": "2026-08-22T10:00:00Z",
+    "updated_at": "2026-08-22T10:30:00Z"
+  },
+  "files": [
+    {"file_id": "file_001", "dataset_id": "ds_001", "file_name": "2024年高数期末.pdf", "file_type": "pdf", "file_size": 2048000, "source_type": "exam_paper", "parse_status": "completed", "question_count": 20, "created_at": "2026-08-22T10:01:00Z"},
+    {"file_id": "file_002", "dataset_id": "ds_001", "file_name": "2025年高数期末.docx", "file_type": "docx", "file_size": 512000, "source_type": "exam_paper", "parse_status": "completed", "question_count": 18, "created_at": "2026-08-22T10:02:00Z"}
+  ],
+  "questions": [
+    {"question_id": "q_001", "dataset_id": "ds_001", "file_id": "file_001", "content": "计算二重积分 ∫∫(x+y)dA，其中 D 为单位圆。", "question_type": "calculation", "knowledge_points": ["二重积分", "积分区域"], "difficulty": "medium", "source_year": 2024, "source_page": 2, "source_type": "exam_paper"},
+    {"question_id": "q_002", "dataset_id": "ds_001", "file_id": "file_002", "content": "判断无穷级数的收敛性。", "question_type": "proof", "knowledge_points": ["无穷级数"], "difficulty": "hard", "source_year": 2025, "source_page": 3, "source_type": "exam_paper"}
+  ],
+  "analysis": {
+    "analysis_id": "analysis_001",
+    "dataset_id": "ds_001",
+    "course": "高等数学",
+    "total_files": 4,
+    "total_questions": 38,
+    "knowledge_points": [{"name": "二重积分", "frequency": 15, "importance": "high", "difficulty": "medium"}, {"name": "无穷级数", "frequency": 12, "importance": "high", "difficulty": "hard"}],
+    "question_types": [{"name": "calculation", "count": 24, "percentage": 63.2}, {"name": "proof", "count": 8, "percentage": 21.1}],
+    "summary": "二重积分和无穷级数是近年考试的高频重点。",
+    "created_at": "2026-08-22T11:00:00Z"
+  },
+  "plan_request": {"exam_date": "2026-08-30", "daily_study_hours": 4, "current_level": "medium"}
+}

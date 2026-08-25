@@ -1,0 +1,13 @@
+services:
+  lingxi-api:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.backend
+    env_file:
+      - ../../.env
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      PORT: 8080
+    ports:
+      - "${API_PORT:-8080}:8080"
+    restart: unless-stopped

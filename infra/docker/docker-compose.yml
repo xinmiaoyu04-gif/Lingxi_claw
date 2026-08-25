@@ -1,0 +1,14 @@
+version: "3.8"
+
+services:
+  lingxi-claw:
+    build:
+      context: ../../
+      dockerfile: infra/docker/Dockerfile
+    ports:
+      - "3000:3000"
+    env_file:
+      - ../../.env
+    volumes:
+      - ../../:/app
+    restart: unless-stopped

@@ -1,0 +1,7 @@
+{
+  "create_dataset": {"success": true, "data": {"dataset_id": "ds_001", "name": "高等数学期末突击", "course": "高等数学", "file_count": 0, "status": "created"}, "error": null},
+  "task_processing": {"success": true, "data": {"task_id": "task_001", "type": "file_processing", "status": "processing", "progress": 75, "processed_files": 3, "total_files": 4, "message": "正在分析第 4 个文件"}, "error": null},
+  "task_partial_success": {"success": true, "data": {"task_id": "task_001", "status": "partial_success", "processed_files": 3, "total_files": 4, "failed_files": [{"name": "损坏文件.pdf", "reason": "文件无法解析"}]}, "error": null},
+  "homework_hint": {"success": true, "data": {"question_id": "q_hw_001", "help_level": "direction", "response": "先观察被积函数是否包含某个内部函数的导数。"}, "error": null},
+  "error_dataset_not_found": {"success": false, "data": null, "error": {"code": "DATASET_NOT_FOUND", "message": "资料集不存在"}}
+}
