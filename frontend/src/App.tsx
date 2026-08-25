@@ -77,6 +77,50 @@ function App() {
   const [homeworkStep, setHomeworkStep] = useState<'idle' | 'analyzing' | 'analyzed'>('idle')
   const homeworkInputRef = useRef<HTMLInputElement>(null)
 
+  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([
+    { role: 'assistant', content: '有什么学习问题想问我？' },
+  ])
+  const [chatInput, setChatInput] = useState('')
+  const [isThinking, setIsThinking] = useState(false)
+  const chatEndRef = useRef<HTMLDivElement>(null)
+
+  const [agentResponseStyle, setAgentResponseStyle] = useState<'concise' | 'normal' | 'detailed'>('normal')
+  const [agentGuideFirst, setAgentGuideFirst] = useState(true)
+  const [agentNoDirectAnswer, setAgentNoDirectAnswer] = useState(true)
+  const [agentStepByStep, setAgentStepByStep] = useState(true)
+  const [agentSaved, setAgentSaved] = useState(false)
+
+  const resetAgentSettings = () => {
+    setAgentResponseStyle('normal')
+    setAgentGuideFirst(true)
+    setAgentNoDirectAnswer(true)
+    setAgentStepByStep(true)
+  }
+
+  const saveAgentSettings = () => {
+    setAgentSaved(true)
+    setTimeout(() => setAgentSaved(false), 2000)
+  }
+
+  const getMockReply = (text: string) => {
+    if (text.includes('概率')) return '概率是研究随机事件发生可能性的数学分支，常用条件概率、贝叶斯公式等工具来分析事件之间的关系。'
+    if (text.includes('积分')) return '积分是微积分中的核心概念之一，常用于求面积、体积、平均值等，常见方法包括换元法和分部积分法。'
+    if (text.includes('Python')) return '学习 Python 建议先从变量、条件、循环和函数入手，再逐步学习数据结构、面向对象和常用标准库。'
+    return '这是一个很好的学习问题。我们可以先分析题目的核心概念，再一步一步解决它。'
+  }
+
+  const sendChat = () => {
+    const text = chatInput.trim()
+    if (!text || isThinking) return
+    setChatMessages((s) => [...s, { role: 'user', content: text }])
+    setChatInput('')
+    setIsThinking(true)
+    setTimeout(() => {
+      setChatMessages((s) => [...s, { role: 'assistant', content: getMockReply(text) }])
+      setIsThinking(false)
+    }, 1000)
+  }
+
   if (currentMode === 'final-sprint') {
     return (
       <div className="app-layout">
@@ -374,6 +418,155 @@ function App() {
                 </div>
               </div>
             )}
+          </div>
+        </main>
+      </div>
+    )
+  }
+
+  if (currentMode === 'general-question') {
+    return (
+      <div className="app-layout">
+        <aside className="sidebar">
+          <div className="sidebar-header">
+            <div className="sidebar-title">灵犀-Claw</div>
+            <div className="sidebar-subtitle">Study with 灵犀-Claw</div>
+          </div>
+          <nav className="sidebar-nav">
+            {modes.map((mode) => (
+              <div
+                key={mode.id}
+                className={`sidebar-item ${currentMode === mode.id ? 'active' : ''}`}
+                onClick={() => setCurrentMode(mode.id)}
+              >
+                {mode.label}
+              </div>
+            ))}
+          </nav>
+        </aside>
+        <main className="main-content">
+          <div className="mode-panel chat-panel">
+            <div className="mode-icon">{current.label.split(' ')[0]}</div>
+            <h1>{current.title}</h1>
+            <p className="subtitle">{current.description}</p>
+
+            <div className="chat-area">
+              {chatMessages.map((msg, index) => (
+                <div key={index} className={`chat-message ${msg.role}`}>
+                  <div className="chat-bubble">{msg.content}</div>
+                </div>
+              ))}
+              {isThinking && (
+                <div className="chat-message assistant">
+                  <div className="chat-bubble">正在思考...</div>
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+
+            <div className="chat-input-area">
+              <input
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && sendChat()}
+                className="chat-input"
+                placeholder="输入你的学习问题..."
+              />
+              <button className="primary-button" onClick={sendChat} disabled={!chatInput.trim() || isThinking}>
+                发送
+              </button>
+            </div>
+          </div>
+        </main>
+      </div>
+    )
+  }
+
+  if (currentMode === 'agent-settings') {
+    return (
+      <div className="app-layout">
+        <aside className="sidebar">
+          <div className="sidebar-header">
+            <div className="sidebar-title">灵犀-Claw</div>
+            <div className="sidebar-subtitle">Study with 灵犀-Claw</div>
+          </div>
+          <nav className="sidebar-nav">
+            {modes.map((mode) => (
+              <div
+                key={mode.id}
+                className={`sidebar-item ${currentMode === mode.id ? 'active' : ''}`}
+                onClick={() => setCurrentMode(mode.id)}
+              >
+                {mode.label}
+              </div>
+            ))}
+          </nav>
+        </aside>
+        <main className="main-content">
+          <div className="mode-panel settings-panel">
+            <div className="mode-icon">{current.label.split(' ')[0]}</div>
+            <h1>{current.title}</h1>
+            <p className="subtitle">{current.description}</p>
+
+            <div className="settings-section">
+              <div className="settings-title">回答风格</div>
+              <div className="settings-options">
+                {[
+                  { value: 'concise', label: '极速简洁' },
+                  { value: 'normal', label: '标准讲解' },
+                  { value: 'detailed', label: '详细教学' },
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    className={`settings-option ${agentResponseStyle === option.value ? 'active' : ''}`}
+                    onClick={() => setAgentResponseStyle(option.value as typeof agentResponseStyle)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="settings-section">
+              <div className="settings-title">学习方式</div>
+              <div className="settings-toggles">
+                <label className="settings-toggle">
+                  <input
+                    type="checkbox"
+                    checked={agentGuideFirst}
+                    onChange={(e) => setAgentGuideFirst(e.target.checked)}
+                  />
+                  <span>优先引导我思考</span>
+                </label>
+                <label className="settings-toggle">
+                  <input
+                    type="checkbox"
+                    checked={agentNoDirectAnswer}
+                    onChange={(e) => setAgentNoDirectAnswer(e.target.checked)}
+                  />
+                  <span>不直接给出最终答案</span>
+                </label>
+                <label className="settings-toggle">
+                  <input
+                    type="checkbox"
+                    checked={agentStepByStep}
+                    onChange={(e) => setAgentStepByStep(e.target.checked)}
+                  />
+                  <span>使用分步骤讲解</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="settings-actions">
+              <button className="primary-button" onClick={saveAgentSettings}>
+                保存我的 Agent 设置
+              </button>
+              <button className="secondary-button" onClick={resetAgentSettings}>
+                恢复默认设置
+              </button>
+            </div>
+
+            {agentSaved && <div className="settings-saved">✓ Agent 设置已保存</div>}
           </div>
         </main>
       </div>
