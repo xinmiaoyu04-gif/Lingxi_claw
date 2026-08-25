@@ -1,0 +1,6 @@
+{
+  "homework": {"homework_id": "hw_001", "course": "高等数学", "file_id": "file_010", "status": "analyzed", "question_count": 1, "created_at": "2026-08-22T14:00:00Z"},
+  "question": {"question_id": "q_hw_001", "homework_id": "hw_001", "content": "计算不定积分 ∫2x cos(x²)dx。", "question_type": "calculation", "knowledge_points": ["换元积分法"], "difficulty": "medium"},
+  "hint_request": {"question_id": "q_hw_001", "user_message": "我不知道第一步怎么做", "help_level": "direction"},
+  "answer_request": {"question_id": "q_hw_001", "user_answer": "令 t=x²，则 dt=2x dx，原式为 sin(x²)+C。"}
+}
