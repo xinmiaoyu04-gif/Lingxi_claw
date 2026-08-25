@@ -1,0 +1,66 @@
+:root {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color: #213547;
+  background-color: #ffffff;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+}
+
+.welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 2rem;
+  text-align: center;
+}
+
+.welcome h1 {
+  font-size: 3.2rem;
+  line-height: 1.1;
+  margin: 0;
+  color: #4f46e5;
+}
+
+.subtitle {
+  font-size: 1.5rem;
+  margin-top: 1rem;
+  color: #334155;
+}
+
+.description {
+  font-size: 1.125rem;
+  margin-top: 0.75rem;
+  color: #64748b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color: #f3f4f6;
+    background-color: #0f172a;
+  }
+
+  .subtitle {
+    color: #e5e7eb;
+  }
+
+  .description {
+    color: #9ca3af;
+  }
+}
