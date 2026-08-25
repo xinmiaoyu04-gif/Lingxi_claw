@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 
 const modes = [
   {
@@ -121,6 +121,10 @@ function App() {
     }, 1000)
   }
 
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [chatMessages, isThinking])
+
   if (currentMode === 'final-sprint') {
     return (
       <div className="app-layout">
@@ -236,7 +240,15 @@ function App() {
                     type="number"
                     min={1}
                     value={days}
-                    onChange={(e) => setDays(Number(e.target.value))}
+                    onChange={(e) => {
+                      const raw = e.target.value
+                      if (raw === '') {
+                        setDays(1)
+                        return
+                      }
+                      const num = Number(raw)
+                      setDays(Number.isNaN(num) || num < 1 ? 1 : Math.round(num))
+                    }}
                   />
                 </div>
 
@@ -572,35 +584,6 @@ function App() {
       </div>
     )
   }
-
-  return (
-    <div className="app-layout">
-      <aside className="sidebar">
-        <div className="sidebar-header">
-          <div className="sidebar-title">灵犀-Claw</div>
-          <div className="sidebar-subtitle">Study with 灵犀-Claw</div>
-        </div>
-        <nav className="sidebar-nav">
-          {modes.map((mode) => (
-            <div
-              key={mode.id}
-              className={`sidebar-item ${currentMode === mode.id ? 'active' : ''}`}
-              onClick={() => setCurrentMode(mode.id)}
-            >
-              {mode.label}
-            </div>
-          ))}
-        </nav>
-      </aside>
-      <main className="main-content">
-        <div className="mode-panel">
-          <div className="mode-icon">{current.label.split(' ')[0]}</div>
-          <h1>{current.title}</h1>
-          <p className="subtitle">{current.description}</p>
-        </div>
-      </main>
-    </div>
-  )
 }
 
 export default App
