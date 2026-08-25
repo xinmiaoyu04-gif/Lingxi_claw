@@ -18,36 +18,86 @@ body {
 
 #root {
   width: 100%;
-  min-height: 100vh;
+  height: 100vh;
 }
 
-.welcome {
+.app-layout {
+  display: flex;
+  height: 100vh;
+  width: 100%;
+}
+
+.sidebar {
+  width: 240px;
+  border-right: 1px solid #e2e8f0;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  padding: 24px 16px;
+}
+
+.sidebar-header {
+  margin-bottom: 32px;
+}
+
+.sidebar-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.sidebar-subtitle {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin-top: 4px;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sidebar-item {
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 0.9375rem;
+  color: #334155;
+  cursor: pointer;
+  user-select: none;
+}
+
+.sidebar-item.active {
+  background: #4f46e5;
+  color: #ffffff;
+}
+
+.mode-panel {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 100vh;
   padding: 2rem;
   text-align: center;
+  gap: 0.75rem;
 }
 
-.welcome h1 {
-  font-size: 3.2rem;
-  line-height: 1.1;
+.mode-icon {
+  font-size: 3rem;
+  line-height: 1;
+}
+
+.mode-panel h1 {
+  font-size: 2.25rem;
+  line-height: 1.2;
   margin: 0;
-  color: #4f46e5;
+  color: #0f172a;
 }
 
-.subtitle {
-  font-size: 1.5rem;
-  margin-top: 1rem;
-  color: #334155;
-}
-
-.description {
+.mode-panel .subtitle {
   font-size: 1.125rem;
-  margin-top: 0.75rem;
-  color: #64748b;
+  color: #475569;
+  max-width: 480px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -56,11 +106,37 @@ body {
     background-color: #0f172a;
   }
 
-  .subtitle {
-    color: #e5e7eb;
+  .sidebar {
+    background: #0f172a;
+    border-right-color: #1e293b;
   }
 
-  .description {
-    color: #9ca3af;
+  .sidebar-title {
+    color: #f3f4f6;
+  }
+
+  .sidebar-subtitle {
+    color: #94a3b8;
+  }
+
+  .sidebar-item {
+    color: #e2e8f0;
+  }
+
+  .sidebar-item.active {
+    background: #4f46e5;
+    color: #ffffff;
+  }
+
+  .main-content {
+    background: #020617;
+  }
+
+  .mode-panel h1 {
+    color: #f3f4f6;
+  }
+
+  .mode-panel .subtitle {
+    color: #cbd5e1;
   }
 }
