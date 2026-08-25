@@ -329,6 +329,90 @@ body {
   background: #f8fafc;
 }
 
+.plan-result {
+  margin-top: 1rem;
+  width: 100%;
+  max-width: 640px;
+  text-align: left;
+}
+
+.plan-header {
+  margin-bottom: 1rem;
+}
+
+.plan-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.plan-subtitle {
+  font-size: 0.9375rem;
+  color: #475569;
+  margin-top: 0.25rem;
+}
+
+.plan-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.plan-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px;
+  background: #ffffff;
+}
+
+.plan-day {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #4f46e5;
+}
+
+.plan-day-title {
+  margin-top: 0.25rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.plan-items {
+  margin-top: 0.5rem;
+  padding-left: 1.25rem;
+  font-size: 0.9375rem;
+  color: #334155;
+  line-height: 1.6;
+}
+
+.plan-items li {
+  margin-bottom: 0.25rem;
+}
+
+.homework-result {
+  margin-top: 1rem;
+  width: 100%;
+  max-width: 640px;
+  text-align: left;
+}
+
+.homework-steps {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.homework-step {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #ffffff;
+  font-size: 0.9375rem;
+  color: #0f172a;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     color: #f3f4f6;
@@ -463,5 +547,32 @@ body {
 
   .secondary-button:hover {
     background: #111827;
+  }
+
+  .plan-title {
+    color: #f3f4f6;
+  }
+
+  .plan-subtitle {
+    color: #cbd5e1;
+  }
+
+  .plan-card {
+    background: #0f172a;
+    border-color: #1e293b;
+  }
+
+  .plan-day-title {
+    color: #f3f4f6;
+  }
+
+  .plan-items {
+    color: #cbd5e1;
+  }
+
+  .homework-step {
+    background: #0f172a;
+    border-color: #1e293b;
+    color: #f3f4f6;
   }
 }

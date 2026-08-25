@@ -36,13 +36,46 @@ const analysisResult = {
   ],
 }
 
+const basePlans = [
+  {
+    title: '高频考点复习',
+    items: ['二重积分', '条件概率', '完成基础计算题', '整理核心公式'],
+  },
+  {
+    title: '综合题训练',
+    items: ['随机变量分布', '无穷级数', '完成综合练习', '整理错题'],
+  },
+  {
+    title: '最后冲刺',
+    items: ['模拟考试', '高频题型回顾', '完成一套模拟题', '查漏补缺'],
+  },
+]
+
+function buildPlans(days: number) {
+  const safe = Math.max(1, days)
+  const plans = basePlans.slice(0, Math.min(safe, 3))
+  if (safe > 3) {
+    for (let i = 4; i <= safe; i++) {
+      plans.push({
+        title: `第 ${i} 天：自主复习`,
+        items: ['复习错题本', '回顾高频公式', '保持做题手感'],
+      })
+    }
+  }
+  return plans
+}
+
 function App() {
   const [currentMode, setCurrentMode] = useState('final-sprint')
   const current = modes.find((m) => m.id === currentMode) || modes[0]
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
-  const [step, setStep] = useState<'idle' | 'analyzing' | 'analyzed'>('idle')
+  const [step, setStep] = useState<'idle' | 'analyzing' | 'analyzed' | 'planning' | 'planned'>('idle')
   const [days, setDays] = useState(3)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const [homeworkFiles, setHomeworkFiles] = useState<File[]>([])
+  const [homeworkStep, setHomeworkStep] = useState<'idle' | 'analyzing' | 'analyzed'>('idle')
+  const homeworkInputRef = useRef<HTMLInputElement>(null)
 
   if (currentMode === 'final-sprint') {
     return (
@@ -164,11 +197,179 @@ function App() {
                 </div>
 
                 <div className="result-actions">
-                  <button className="primary-button" onClick={() => alert('冲刺计划将在下一步生成')}>
+                  <button className="primary-button" onClick={() => {
+                    setStep('planning')
+                    setTimeout(() => setStep('planned'), 1000)
+                  }}>
                     生成我的冲刺计划
                   </button>
                   <button className="secondary-button" onClick={() => { setStep('idle'); setSelectedFiles([]) }}>
                     重新选择资料
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {step === 'planning' && (
+              <div className="analyze-loading">
+                <div className="analyze-loading-text">正在为你制定冲刺计划...</div>
+                <div className="analyze-loading-sub">剩余复习天数：{days} 天</div>
+              </div>
+            )}
+
+            {step === 'planned' && (
+              <div className="plan-result">
+                <div className="plan-header">
+                  <div className="plan-title">📅 我的期末冲刺计划</div>
+                  <div className="plan-subtitle">距离考试还有 {days} 天</div>
+                </div>
+
+                <div className="plan-list">
+                  {buildPlans(days).map((plan, index) => (
+                    <div key={index} className="plan-card">
+                      <div className="plan-day">Day {index + 1}</div>
+                      <div className="plan-day-title">{plan.title}</div>
+                      <ul className="plan-items">
+                        {plan.items.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="result-actions">
+                  <button className="secondary-button" onClick={() => setStep('analyzed')}>
+                    重新制定计划
+                  </button>
+                  <button className="secondary-button" onClick={() => { setStep('idle'); setSelectedFiles([]) }}>
+                    重新选择资料
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </main>
+      </div>
+    )
+  }
+
+  if (currentMode === 'homework') {
+    return (
+      <div className="app-layout">
+        <aside className="sidebar">
+          <div className="sidebar-header">
+            <div className="sidebar-title">灵犀-Claw</div>
+            <div className="sidebar-subtitle">Study with 灵犀-Claw</div>
+          </div>
+          <nav className="sidebar-nav">
+            {modes.map((mode) => (
+              <div
+                key={mode.id}
+                className={`sidebar-item ${currentMode === mode.id ? 'active' : ''}`}
+                onClick={() => setCurrentMode(mode.id)}
+              >
+                {mode.label}
+              </div>
+            ))}
+          </nav>
+        </aside>
+        <main className="main-content">
+          <div className="mode-panel">
+            <div className="mode-icon">{current.label.split(' ')[0]}</div>
+            <h1>{current.title}</h1>
+            <p className="subtitle">{current.description}</p>
+
+            {homeworkStep === 'idle' && (
+              <>
+                <div
+                  className="upload-area"
+                  onClick={() => homeworkInputRef.current?.click()}
+                >
+                  <div className="upload-hint">点击上传作业题目</div>
+                  <div className="upload-types">支持图片和常见文档格式</div>
+                  <input
+                    ref={homeworkInputRef}
+                    type="file"
+                    multiple
+                    className="hidden-input"
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || [])
+                      setHomeworkFiles(files)
+                    }}
+                  />
+                </div>
+
+                {homeworkFiles.length > 0 && (
+                  <div className="file-summary">
+                    <div className="file-summary-title">已选择 {homeworkFiles.length} 个文件</div>
+                    <div className="file-list">
+                      {homeworkFiles.map((file, index) => (
+                        <div key={index} className="file-item">
+                          <div className="file-name">{file.name}</div>
+                          <div className="file-size">{(file.size / 1024).toFixed(1)} KB</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  className="primary-button"
+                  disabled={homeworkFiles.length === 0}
+                  onClick={() => {
+                    setHomeworkStep('analyzing')
+                    setTimeout(() => setHomeworkStep('analyzed'), 1000)
+                  }}
+                >
+                  开始解析题目
+                </button>
+              </>
+            )}
+
+            {homeworkStep === 'analyzing' && (
+              <div className="analyze-loading">
+                <div className="analyze-loading-text">正在解析你的作业题目...</div>
+                <div className="analyze-loading-sub">正在处理 {homeworkFiles.length} 个文件</div>
+              </div>
+            )}
+
+            {homeworkStep === 'analyzed' && (
+              <div className="homework-result">
+                <div className="analyze-result-header">
+                  <div className="analyze-result-title">题目解析完成</div>
+                  <div className="analyze-result-sub">已解析 {homeworkFiles.length} 个文件</div>
+                </div>
+
+                <div className="result-section">
+                  <div className="result-title">题目类型</div>
+                  <div className="result-item">计算题</div>
+                </div>
+
+                <div className="result-section">
+                  <div className="result-title">涉及知识点</div>
+                  <div className="result-list">
+                    <div className="result-item">条件概率</div>
+                    <div className="result-item">贝叶斯公式</div>
+                  </div>
+                </div>
+
+                <div className="result-section">
+                  <div className="result-title">解题思路</div>
+                  <div className="homework-steps">
+                    <div className="homework-step">1. 先确定已知条件和要求的目标事件</div>
+                    <div className="homework-step">2. 将题目转换为概率表达式</div>
+                    <div className="homework-step">3. 判断是否需要使用条件概率公式</div>
+                    <div className="homework-step">4. 代入数据并完成计算</div>
+                  </div>
+                </div>
+
+                <div className="result-actions">
+                  <button className="primary-button" onClick={() => alert('请先自己尝试完成，这里不直接展示最终答案')}>
+                    我已经尝试完成
+                  </button>
+                  <button className="secondary-button" onClick={() => { setHomeworkStep('idle'); setHomeworkFiles([]) }}>
+                    换一道题
                   </button>
                 </div>
               </div>
