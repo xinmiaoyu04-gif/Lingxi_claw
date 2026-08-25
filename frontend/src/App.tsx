@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 
 const modes = [
   {
@@ -30,6 +30,85 @@ const modes = [
 function App() {
   const [currentMode, setCurrentMode] = useState('final-sprint')
   const current = modes.find((m) => m.id === currentMode) || modes[0]
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+  const [analysisMessage, setAnalysisMessage] = useState('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  if (currentMode === 'final-sprint') {
+    return (
+      <div className="app-layout">
+        <aside className="sidebar">
+          <div className="sidebar-header">
+            <div className="sidebar-title">灵犀-Claw</div>
+            <div className="sidebar-subtitle">Study with 灵犀-Claw</div>
+          </div>
+          <nav className="sidebar-nav">
+            {modes.map((mode) => (
+              <div
+                key={mode.id}
+                className={`sidebar-item ${currentMode === mode.id ? 'active' : ''}`}
+                onClick={() => setCurrentMode(mode.id)}
+              >
+                {mode.label}
+              </div>
+            ))}
+          </nav>
+        </aside>
+        <main className="main-content">
+          <div className="mode-panel">
+            <div className="mode-icon">{current.label.split(' ')[0]}</div>
+            <h1>{current.title}</h1>
+            <p className="subtitle">{current.description}</p>
+
+            <div
+              className="upload-area"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <div className="upload-hint">点击选择学习资料</div>
+              <div className="upload-types">支持 PDF、图片、Word、文本文件</div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                className="hidden-input"
+                onChange={(e) => {
+                  const files = Array.from(e.target.files || [])
+                  setSelectedFiles(files)
+                  setAnalysisMessage('')
+                }}
+              />
+            </div>
+
+            {selectedFiles.length > 0 && (
+              <div className="file-summary">
+                <div className="file-summary-title">已选择 {selectedFiles.length} 个文件</div>
+                <div className="file-list">
+                  {selectedFiles.map((file, index) => (
+                    <div key={index} className="file-item">
+                      <div className="file-name">{file.name}</div>
+                      <div className="file-size">{(file.size / 1024).toFixed(1)} KB</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <button
+              className="primary-button"
+              disabled={selectedFiles.length === 0 || !!analysisMessage}
+              onClick={() => setAnalysisMessage('资料已准备好，下一步将进行分析')}
+            >
+              开始分析资料
+            </button>
+
+            {analysisMessage && (
+              <div className="analysis-message">{analysisMessage}</div>
+            )}
+          </div>
+        </main>
+      </div>
+    )
+  }
 
   return (
     <div className="app-layout">
