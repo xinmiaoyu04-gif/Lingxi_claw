@@ -1,12 +1,4 @@
-# Lingxi-claw API Specification
-
-> Version: v0.1.0  
-> Status: Hackathon MVP  
-> Backend: Go  
-> API Style: RESTful JSON API  
-> Frontend / Testing: Vibe Coding
-
----
+# Study with Lingxi-claw - API 接口定义
 
 # 1. 文档目的
 
@@ -18,6 +10,8 @@
 Frontend
     ↓ HTTP Request
 Backend API
+    ↓
+Business Service
     ↓
 Workflow / Router / Agent
     ↓
@@ -46,988 +40,195 @@ Frontend
 团队确认
     ↓
 修改代码
+    ↓
+Frontend / Backend / QA 同步
 ```
 
 而不是直接修改代码。
 
 ---
 
-# 2. 基础约定
+# 2. 当前阶段说明
 
-## 2.1 Base URL
+当前项目处于 **V02 页面架构与前后端协作阶段**。
+
+当前目标：
+
+```text
+完成页面
+    ↓
+完成路由
+    ↓
+定义 API Contract
+    ↓
+使用 Mock Data
+    ↓
+前后端并行开发
+    ↓
+后续进行真实 API 联调
+```
+
+当前阶段：
+
+```text
+✅ 页面框架
+✅ 路由
+✅ API Contract
+✅ Mock API
+✅ Mock Data
+```
+
+暂不要求：
+
+```text
+❌ 真实 AI 模型
+❌ 真实 Agent
+❌ 真实 Workflow
+❌ 真实 OCR
+❌ 真实知识库
+❌ 真实向量检索
+❌ 真实学习分析算法
+```
+
+因此所有 API 都必须设计成：
+
+> **现在可以 Mock，未来可以无缝替换为真实 Backend。**
+
+---
+
+# 3. API 基础规范
+
+## 3.1 Base URL
 
 开发环境：
 
 ```text
-http://localhost:8080
+/api
 ```
 
-所有 API 使用：
+例如：
 
 ```text
-/api/v1
+GET /api/courses
 ```
 
-因此完整接口示例：
+生产环境 Base URL 根据部署环境配置。
 
-```text
-POST http://localhost:8080/api/v1/chat
-```
+Frontend 不应该在业务代码中硬编码完整域名。
 
 ---
 
-# 3. Content-Type
+# 4. HTTP 方法规范
 
-普通 JSON 请求：
-
-```http
-Content-Type: application/json
-```
-
-文件上传：
-
-```http
-Content-Type: multipart/form-data
-```
+| 方法     | 用途          |
+| ------ | ----------- |
+| GET    | 获取数据        |
+| POST   | 创建数据 / 执行任务 |
+| PUT    | 完整更新        |
+| PATCH  | 部分更新        |
+| DELETE | 删除数据        |
 
 ---
 
-# 4. 统一 Response 格式
+# 5. Response 基础结构
 
-所有接口尽量使用统一返回结构。
-
-## 成功
+所有 API 推荐使用统一 Response：
 
 ```json
 {
   "success": true,
   "data": {},
-  "error": null
+  "message": null
 }
 ```
 
-## 失败
+失败：
 
 ```json
 {
   "success": false,
   "data": null,
-  "error": {
-    "code": "ERROR_CODE",
-    "message": "错误描述"
-  }
+  "message": "课程不存在"
 }
 ```
 
 ---
 
-# 5. 通用错误码
+# 6. HTTP Status Code
 
-| HTTP Status | Code | 含义 |
-|---|---|---|
-| 400 | INVALID_REQUEST | 请求参数错误 |
-| 400 | INVALID_FILE | 不支持的文件 |
-| 404 | DATASET_NOT_FOUND | 数据集不存在 |
-| 404 | TASK_NOT_FOUND | 任务不存在 |
-| 404 | HOMEWORK_NOT_FOUND | 作业不存在 |
-| 422 | FILE_PARSE_ERROR | 文件解析失败 |
-| 422 | QUESTION_PARSE_ERROR | 题目识别失败 |
-| 500 | INTERNAL_ERROR | 服务器内部错误 |
-| 503 | MODEL_UNAVAILABLE | 模型服务不可用 |
+| Status | 含义             |
+| ------ | -------------- |
+| 200    | 请求成功           |
+| 201    | 创建成功           |
+| 400    | 请求参数错误         |
+| 401    | 未认证            |
+| 403    | 无权限            |
+| 404    | 资源不存在          |
+| 409    | 数据冲突           |
+| 422    | 参数校验失败         |
+| 500    | 服务端错误          |
+| 503    | AI / 外部服务暂时不可用 |
 
----
+Frontend 不应该仅依赖 HTTP Status 判断业务状态。
 
-# 6. 核心数据对象
-
-## 6.1 Dataset
-
-Dataset 表示用户一次期末复习任务中的资料集合。
-
-例如：
-
-```text
-高等数学期末复习
-├── 2023年期末试卷.pdf
-├── 2024年期末试卷.docx
-├── 2025年期末试卷.pdf
-└── 教师复习资料.pdf
-```
-
-对应一个 Dataset。
-
-结构：
+优先读取：
 
 ```json
 {
-  "dataset_id": "ds_xxxxx",
-  "name": "高等数学期末复习",
-  "course": "高等数学",
-  "file_count": 4,
-  "status": "ready",
-  "created_at": "2026-08-22T10:00:00Z"
+  "success": false,
+  "message": "..."
 }
 ```
 
 ---
 
-## 6.2 Task
+# 7. 核心资源模型
 
-Task 表示后台异步任务。
-
-例如：
-
-- OCR
-- 批量文件解析
-- 题目分类
-- 考点分析
-
-结构：
-
-```json
-{
-  "task_id": "task_xxxxx",
-  "type": "file_processing",
-  "status": "processing",
-  "progress": 65,
-  "message": "正在分析第 3 个文件"
-}
-```
-
-Task 状态：
+当前 API 主要围绕以下资源：
 
 ```text
-pending
-processing
-completed
-failed
-partial_success
+User
+ │
+ ├── LearningProfile
+ │
+ ├── AIPreference
+ │
+ └── Course
+       │
+       ├── CourseMaterial
+       │
+       ├── Homework
+       │
+       ├── Mistake
+       │
+       ├── LearningRecord
+       │
+       └── CourseAnalytics
 ```
 
----
-
-# 7. API 总览
-
-## 📚 期末突击
+整体关系：
 
 ```text
-POST   /api/v1/final-sprint/datasets
-POST   /api/v1/final-sprint/datasets/{dataset_id}/files
-GET    /api/v1/tasks/{task_id}
-
-POST   /api/v1/final-sprint/datasets/{dataset_id}/analyze
-GET    /api/v1/final-sprint/datasets/{dataset_id}/analysis
-
-POST   /api/v1/final-sprint/datasets/{dataset_id}/plan
-GET    /api/v1/final-sprint/datasets/{dataset_id}/plan
-
-POST   /api/v1/final-sprint/datasets/{dataset_id}/practice
-POST   /api/v1/practice/{session_id}/answer
-```
-
----
-
-## 📝 日常作业辅助
-
-```text
-POST   /api/v1/homework
-POST   /api/v1/homework/{homework_id}/hint
-POST   /api/v1/homework/{homework_id}/answer
-```
-
----
-
-## ❓ 其它问题
-
-```text
-POST   /api/v1/chat
-```
-
----
-
-## 🤖 Agent 设定
-
-```text
-GET    /api/v1/settings/agent
-PUT    /api/v1/settings/agent
-```
-
----
-
-# 8. 期末突击 API
-
----
-
-# 8.1 创建 Dataset
-
-创建一个新的期末复习任务。
-
-## Request
-
-```http
-POST /api/v1/final-sprint/datasets
-Content-Type: application/json
-```
-
-Body：
-
-```json
-{
-  "name": "高等数学期末突击",
-  "course": "高等数学"
-}
-```
-
-字段：
-
-| 字段 | 类型 | 必填 | 描述 |
-|---|---|---|---|
-| name | string | 是 | Dataset 名称 |
-| course | string | 是 | 课程名称 |
-
----
-
-## Response
-
-```json
-{
-  "success": true,
-  "data": {
-    "dataset_id": "ds_001",
-    "name": "高等数学期末突击",
-    "course": "高等数学",
-    "file_count": 0,
-    "status": "created"
-  },
-  "error": null
-}
-```
-
----
-
-# 8.2 批量上传文件
-
-用户可以一次上传多个文件。
-
-支持：
-
-```text
-PDF
-DOCX
-图片
-扫描版 PDF
-```
-
-## Request
-
-```http
-POST /api/v1/final-sprint/datasets/{dataset_id}/files
-Content-Type: multipart/form-data
-```
-
-FormData：
-
-```text
-files[]: 2023期末.pdf
-files[]: 2024期末.docx
-files[]: 2025期末.pdf
-files[]: 教师复习资料.pdf
-```
-
----
-
-## Response
-
-```json
-{
-  "success": true,
-  "data": {
-    "dataset_id": "ds_001",
-    "task_id": "task_001",
-    "total_files": 4,
-    "status": "processing"
-  },
-  "error": null
-}
-```
-
----
-
-## 后端逻辑
-
-```text
-API
+User
  ↓
-FinalSprintWorkflow
+Courses
  ↓
-File Router
- ↓
-判断文件类型
- ↓
-┌───────────┬──────────────┬───────────┐
-↓           ↓              ↓
-DOCX        Text PDF       Scan PDF
-↓           ↓              ↓
-Parser      Parser         OCR
- ↓
-统一文本 / 图片内容
- ↓
-Question Service
- ↓
-Question Bank
+Course Space
+ ├── Overview
+ ├── Materials
+ ├── Homework
+ ├── Mistakes
+ └── Analytics
 ```
 
 ---
 
-# 8.3 查询异步任务
+# 8. 用户与学习画像 API
 
-用于前端获取文件处理进度。
-
-## Request
+## 8.1 获取学习画像
 
 ```http
-GET /api/v1/tasks/{task_id}
-```
-
----
-
-## Response
-
-```json
-{
-  "success": true,
-  "data": {
-    "task_id": "task_001",
-    "type": "file_processing",
-    "status": "processing",
-    "progress": 75,
-    "processed_files": 3,
-    "total_files": 4,
-    "message": "正在分析第 4 个文件"
-  },
-  "error": null
-}
-```
-
-处理完成：
-
-```json
-{
-  "success": true,
-  "data": {
-    "task_id": "task_001",
-    "status": "completed",
-    "progress": 100,
-    "processed_files": 4,
-    "total_files": 4
-  },
-  "error": null
-}
-```
-
-部分成功：
-
-```json
-{
-  "success": true,
-  "data": {
-    "task_id": "task_001",
-    "status": "partial_success",
-    "processed_files": 3,
-    "total_files": 4,
-    "failed_files": [
-      {
-        "name": "损坏文件.pdf",
-        "reason": "文件无法解析"
-      }
-    ]
-  },
-  "error": null
-}
-```
-
----
-
-# 8.4 分析历年题
-
-启动历年题分析。
-
-系统分析：
-
-- 高频考点
-- 高频题型
-- 题目出现次数
-- 难度
-- 重点内容
-
-## Request
-
-```http
-POST /api/v1/final-sprint/datasets/{dataset_id}/analyze
-```
-
-Body：
-
-```json
-{}
-```
-
----
-
-## Response
-
-```json
-{
-  "success": true,
-  "data": {
-    "task_id": "task_002",
-    "dataset_id": "ds_001",
-    "status": "processing"
-  },
-  "error": null
-}
-```
-
----
-
-# 8.5 获取分析结果
-
-## Request
-
-```http
-GET /api/v1/final-sprint/datasets/{dataset_id}/analysis
-```
-
----
-
-## Response
-
-```json
-{
-  "success": true,
-  "data": {
-    "dataset_id": "ds_001",
-    "course": "高等数学",
-    "total_questions": 120,
-    "knowledge_points": [
-      {
-        "name": "二重积分",
-        "frequency": 15,
-        "importance": "high",
-        "difficulty": "medium"
-      },
-      {
-        "name": "无穷级数",
-        "frequency": 12,
-        "importance": "high",
-        "difficulty": "high"
-      }
-    ],
-    "question_types": [
-      {
-        "name": "计算题",
-        "count": 65
-      },
-      {
-        "name": "证明题",
-        "count": 20
-      }
-    ]
-  },
-  "error": null
-}
-```
-
----
-
-# 8.6 生成复习计划
-
-根据用户剩余时间生成个性化复习计划。
-
-## Request
-
-```http
-POST /api/v1/final-sprint/datasets/{dataset_id}/plan
-Content-Type: application/json
-```
-
-Body：
-
-```json
-{
-  "exam_date": "2026-08-30",
-  "daily_study_hours": 4,
-  "current_level": "medium"
-}
-```
-
-字段：
-
-| 字段 | 类型 | 必填 | 描述 |
-|---|---|---|---|
-| exam_date | string | 是 | 考试日期 |
-| daily_study_hours | number | 是 | 每日复习时间 |
-| current_level | string | 否 | 用户当前水平 |
-
-current_level：
-
-```text
-low
-medium
-high
-```
-
----
-
-## Response
-
-```json
-{
-  "success": true,
-  "data": {
-    "task_id": "task_003",
-    "status": "processing"
-  },
-  "error": null
-}
-```
-
----
-
-# 8.7 获取复习计划
-
-## Request
-
-```http
-GET /api/v1/final-sprint/datasets/{dataset_id}/plan
-```
-
----
-
-## Response
-
-```json
-{
-  "success": true,
-  "data": {
-    "dataset_id": "ds_001",
-    "days_remaining": 7,
-    "daily_plan": [
-      {
-        "day": 1,
-        "focus": [
-          "二重积分",
-          "三重积分"
-        ],
-        "practice_count": 20,
-        "estimated_hours": 4
-      },
-      {
-        "day": 2,
-        "focus": [
-          "无穷级数"
-        ],
-        "practice_count": 15,
-        "estimated_hours": 4
-      }
-    ]
-  },
-  "error": null
-}
-```
-
----
-
-# 8.8 开始刷题
-
-根据当前学习计划选择题目。
-
-## Request
-
-```http
-POST /api/v1/final-sprint/datasets/{dataset_id}/practice
-Content-Type: application/json
-```
-
-Body：
-
-```json
-{
-  "knowledge_points": [
-    "二重积分"
-  ],
-  "question_count": 5,
-  "difficulty": "medium"
-}
-```
-
----
-
-## Response
-
-```json
-{
-  "success": true,
-  "data": {
-    "session_id": "practice_001",
-    "questions": [
-      {
-        "question_id": "q_001",
-        "content": "计算以下二重积分……",
-        "knowledge_point": "二重积分",
-        "difficulty": "medium"
-      }
-    ]
-  },
-  "error": null
-}
-```
-
----
-
-# 8.9 提交刷题答案
-
-## Request
-
-```http
-POST /api/v1/practice/{session_id}/answer
-Content-Type: application/json
-```
-
-Body：
-
-```json
-{
-  "question_id": "q_001",
-  "user_answer": "用户答案"
-}
-```
-
----
-
-## Response
-
-```json
-{
-  "success": true,
-  "data": {
-    "question_id": "q_001",
-    "correct": false,
-    "feedback": "你的积分区域判断正确，但是积分上下限设置有问题。",
-    "knowledge_gap": [
-      "积分区域转换"
-    ]
-  },
-  "error": null
-}
-```
-
----
-
-# 9. 日常作业辅助 API
-
----
-
-# 9.1 上传并分析作业
-
-用户上传：
-
-- 图片
-- PDF
-- DOCX
-
-## Request
-
-```http
-POST /api/v1/homework
-Content-Type: multipart/form-data
-```
-
-FormData：
-
-```text
-file: homework.jpg
-course: 高等数学
-```
-
----
-
-## Response
-
-```json
-{
-  "success": true,
-  "data": {
-    "homework_id": "hw_001",
-    "task_id": "task_010",
-    "status": "processing"
-  },
-  "error": null
-}
-```
-
-前端随后通过：
-
-```text
-GET /api/v1/tasks/{task_id}
-```
-
-查询处理状态。
-
----
-
-# 9.2 请求解题提示
-
-默认不直接给最终答案。
-
-## Request
-
-```http
-POST /api/v1/homework/{homework_id}/hint
-Content-Type: application/json
-```
-
-Body：
-
-```json
-{
-  "question_id": "q_001",
-  "user_message": "我不知道从哪里开始"
-}
-```
-
----
-
-## Response
-
-```json
-{
-  "success": true,
-  "data": {
-    "question_id": "q_001",
-    "help_level": "direction",
-    "response": "先判断这个题属于什么类型，再考虑是否需要使用换元法。"
-  },
-  "error": null
-}
-```
-
----
-
-# 9.3 提交答案
-
-用户自己完成题目后提交。
-
-## Request
-
-```http
-POST /api/v1/homework/{homework_id}/answer
-Content-Type: application/json
-```
-
-Body：
-
-```json
-{
-  "question_id": "q_001",
-  "user_answer": "我的计算过程和答案"
-}
-```
-
----
-
-## Response
-
-```json
-{
-  "success": true,
-  "data": {
-    "question_id": "q_001",
-    "correct": false,
-    "score": 0.6,
-    "feedback": [
-      {
-        "step": 1,
-        "correct": true,
-        "message": "第一步正确"
-      },
-      {
-        "step": 2,
-        "correct": false,
-        "message": "这里的积分上下限有误"
-      }
-    ],
-    "final_answer": "正确答案"
-  },
-  "error": null
-}
-```
-
----
-
-# 10. 通用 Agent API
-
-用于：
-
-```text
-其它问题
-开放式学习问题
-复杂问题
-```
-
----
-
-# 10.1 Chat
-
-## Request
-
-```http
-POST /api/v1/chat
-Content-Type: application/json
-```
-
-Body：
-
-```json
-{
-  "message": "帮我解释一下什么是贝叶斯公式",
-  "course": "概率论",
-  "agent_settings": {
-    "response_style": "detailed"
-  }
-}
-```
-
----
-
-## Response
-
-```json
-{
-  "success": true,
-  "data": {
-    "message": "贝叶斯公式用于……",
-    "route": {
-      "mode": "general",
-      "complexity": "medium",
-      "handler": "general_agent"
-    }
-  },
-  "error": null
-}
-```
-
-注意：
-
-`route` 主要用于：
-
-- 前端 Debug
-- 成本看板
-- 黑客松 Demo 展示
-
-可以显示：
-
-```text
-当前路由：
-
-General Agent
-    ↓
-Medium Complexity
-    ↓
-Standard Model
-```
-
----
-
-# 11. Agent 设置 API
-
----
-
-# 11.1 获取 Agent 设置
-
-## Request
-
-```http
-GET /api/v1/settings/agent
-```
-
----
-
-## Response
-
-```json
-{
-  "success": true,
-  "data": {
-    "response_style": "detailed",
-    "personality": "encouraging",
-    "answer_policy": "hint_first"
-  },
-  "error": null
-}
-```
-
----
-
-# 11.2 更新 Agent 设置
-
-## Request
-
-```http
-PUT /api/v1/settings/agent
-Content-Type: application/json
-```
-
-Body：
-
-```json
-{
-  "response_style": "concise",
-  "personality": "strict",
-  "answer_policy": "hint_first"
-}
-```
-
----
-
-# 12. 路由信息标准
-
-为了展示项目的核心技术，关键接口可以返回路由信息。
-
-统一格式：
-
-```json
-{
-  "routing": {
-    "workflow": "final_sprint",
-    "file_route": "ocr",
-    "question_type": "calculation",
-    "model_route": "standard_model"
-  }
-}
-```
-
-复杂任务：
-
-```json
-{
-  "routing": {
-    "mode": "agent",
-    "agent": "general_agent",
-    "complexity": "high",
-    "tool": "vision_model",
-    "model_route": "multimodal_model"
-  }
-}
-```
-
----
-
-# 13. Demo 成本与延迟数据
-
-为了黑客松演示，可以增加一个模拟接口。
-
-```http
-GET /api/v1/demo/metrics
+GET /api/profile
 ```
 
 Response：
@@ -1036,328 +237,1427 @@ Response：
 {
   "success": true,
   "data": {
-    "baseline": {
-      "model": "general_large_model",
-      "input_tokens": 2450,
-      "output_tokens": 800,
-      "latency_ms": 3200,
-      "estimated_cost": 0.032
-    },
-    "lingxi_claw": {
-      "pruned_tokens": 1800,
-      "input_tokens": 650,
-      "output_tokens": 500,
-      "latency_ms": 1200,
-      "estimated_cost": 0.008,
-      "route": "lightweight_model"
-    },
-    "improvement": {
-      "token_saved_percent": 73.5,
-      "latency_saved_percent": 62.5,
-      "cost_saved_percent": 75.0
-    }
+    "major": "软件工程",
+    "learningHabits": [
+      "晚上学习",
+      "集中学习"
+    ],
+    "homeworkHabits": [
+      "先自己尝试"
+    ],
+    "aiUsageHabits": [
+      "概念解释",
+      "作业辅导"
+    ],
+    "learningGoals": [
+      "提高课程成绩"
+    ]
   },
-  "error": null
+  "message": null
 }
 ```
 
-前端可以展示：
+---
 
-```text
-┌──────────────────────────────┐
-│ 通用大模型                    │
-│ Token: 2450                 │
-│ 延迟: 3.2s                  │
-│ 成本: $0.032                │
-└──────────────────────────────┘
+## 8.2 更新学习画像
 
-              VS
+```http
+PATCH /api/profile
+```
 
-┌──────────────────────────────┐
-│ Lingxi-claw                  │
-│ Token: 650 ↓73.5%           │
-│ 延迟: 1.2s ↓62.5%           │
-│ 成本: $0.008 ↓75%           │
-└──────────────────────────────┘
+Request：
+
+```json
+{
+  "major": "软件工程",
+  "learningHabits": [
+    "晚上学习"
+  ],
+  "homeworkHabits": [
+    "先自己尝试"
+  ],
+  "aiUsageHabits": [
+    "概念解释"
+  ],
+  "learningGoals": [
+    "提高课程成绩"
+  ]
+}
+```
+
+Response：
+
+```json
+{
+  "success": true,
+  "data": {
+    "major": "软件工程",
+    "learningHabits": [
+      "晚上学习"
+    ],
+    "homeworkHabits": [
+      "先自己尝试"
+    ],
+    "aiUsageHabits": [
+      "概念解释"
+    ],
+    "learningGoals": [
+      "提高课程成绩"
+    ]
+  },
+  "message": null
+}
 ```
 
 ---
 
-# 14. Mock Mode
+# 9. Home API
 
-在后端真实 AI 能力尚未完成时，必须支持 Mock 数据。
+Home 用于展示用户整体学习状态。
 
-推荐：
+---
 
-```text
-APP_MODE=mock
+## 9.1 获取首页数据
+
+```http
+GET /api/home
 ```
 
-Mock 模式：
+Response：
 
-```text
-API Request
-    ↓
-Mock Service
-    ↓
-固定格式 Response
+```json
+{
+  "success": true,
+  "data": {
+    "todayStudy": {
+      "completed": 2,
+      "total": 4
+    },
+    "recentCourses": [
+      {
+        "id": "math",
+        "name": "高等数学",
+        "progress": 68
+      },
+      {
+        "id": "physics",
+        "name": "大学物理",
+        "progress": 52
+      }
+    ],
+    "recentHomework": [],
+    "learningProgress": {
+      "overall": 61
+    },
+    "aiSuggestion": {
+      "title": "建议继续复习高等数学",
+      "description": "当前高等数学存在部分薄弱知识点。"
+    }
+  },
+  "message": null
+}
 ```
 
-真实模式：
+当前阶段允许全部使用 Mock Data。
+
+---
+
+# 10. Courses API
+
+Courses 是用户的课程管理入口。
+
+---
+
+## 10.1 获取课程列表
+
+```http
+GET /api/courses
+```
+
+Response：
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "math",
+      "name": "高等数学",
+      "code": "MATH101",
+      "progress": 68,
+      "mastery": 72,
+      "color": null
+    },
+    {
+      "id": "physics",
+      "name": "大学物理",
+      "code": "PHY101",
+      "progress": 52,
+      "mastery": 61,
+      "color": null
+    },
+    {
+      "id": "linear-algebra",
+      "name": "线性代数",
+      "code": "MATH102",
+      "progress": 45,
+      "mastery": 55,
+      "color": null
+    }
+  ],
+  "message": null
+}
+```
+
+---
+
+## 10.2 获取单门课程
+
+```http
+GET /api/courses/:courseId
+```
+
+例如：
+
+```http
+GET /api/courses/math
+```
+
+Response：
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "math",
+    "name": "高等数学",
+    "code": "MATH101",
+    "description": "大学高等数学课程",
+    "progress": 68,
+    "mastery": 72,
+    "totalMaterials": 12,
+    "pendingHomework": 2,
+    "mistakeCount": 15
+  },
+  "message": null
+}
+```
+
+---
+
+## 10.3 创建课程
+
+```http
+POST /api/courses
+```
+
+Request：
+
+```json
+{
+  "name": "高等数学",
+  "code": "MATH101",
+  "description": "大学高等数学课程"
+}
+```
+
+Response：
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "math",
+    "name": "高等数学",
+    "code": "MATH101",
+    "description": "大学高等数学课程"
+  },
+  "message": null
+}
+```
+
+---
+
+## 10.4 更新课程
+
+```http
+PATCH /api/courses/:courseId
+```
+
+Request：
+
+```json
+{
+  "name": "高等数学",
+  "description": "大学高等数学"
+}
+```
+
+---
+
+## 10.5 删除课程
+
+```http
+DELETE /api/courses/:courseId
+```
+
+Response：
+
+```json
+{
+  "success": true,
+  "data": null,
+  "message": "课程删除成功"
+}
+```
+
+---
+
+# 11. Course Space API
+
+Course Space 是产品的核心二级架构。
+
+所有 Course Space API 都必须携带：
 
 ```text
-API Request
+courseId
+```
+
+例如：
+
+```text
+/courses/math/...
+```
+
+Course Space 包含：
+
+```text
+Overview
+Materials
+Homework
+Mistakes
+Analytics
+```
+
+---
+
+# 12. Course Overview API
+
+## 12.1 获取课程概览
+
+```http
+GET /api/courses/:courseId/overview
+```
+
+例如：
+
+```http
+GET /api/courses/math/overview
+```
+
+Response：
+
+```json
+{
+  "success": true,
+  "data": {
+    "course": {
+      "id": "math",
+      "name": "高等数学"
+    },
+    "progress": 68,
+    "mastery": 72,
+    "todayTasks": 3,
+    "completedTasks": 2,
+    "pendingHomework": 2,
+    "mistakeCount": 15,
+    "weakTopics": [
+      "二重积分",
+      "微分方程"
+    ],
+    "recentActivities": []
+  },
+  "message": null
+}
+```
+
+---
+
+# 13. Course Materials API
+
+课程资料对应 Course Space 中的：
+
+> **课程资料知识库**
+
+---
+
+## 13.1 获取课程资料
+
+```http
+GET /api/courses/:courseId/materials
+```
+
+Response：
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "material-001",
+      "courseId": "math",
+      "name": "高等数学期末复习资料.pdf",
+      "type": "pdf",
+      "size": 1024000,
+      "status": "ready",
+      "createdAt": "2026-08-30T10:00:00Z"
+    }
+  ],
+  "message": null
+}
+```
+
+---
+
+## 13.2 上传课程资料
+
+```http
+POST /api/courses/:courseId/materials
+```
+
+使用：
+
+```text
+multipart/form-data
+```
+
+字段：
+
+```text
+file
+```
+
+支持：
+
+```text
+PDF
+DOCX
+JPG
+PNG
+```
+
+Response：
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "material-002",
+    "name": "高等数学笔记.pdf",
+    "type": "pdf",
+    "status": "processing"
+  },
+  "message": "文件上传成功"
+}
+```
+
+---
+
+## 13.3 获取资料处理状态
+
+```http
+GET /api/courses/:courseId/materials/:materialId
+```
+
+Response：
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "material-002",
+    "status": "processing",
+    "progress": 65
+  },
+  "message": null
+}
+```
+
+`status`：
+
+```text
+uploaded
+processing
+ready
+failed
+```
+
+---
+
+## 13.4 删除资料
+
+```http
+DELETE /api/courses/:courseId/materials/:materialId
+```
+
+---
+
+# 14. Homework API
+
+Course Space 中的：
+
+> **AI 作业辅导**
+
+---
+
+## 14.1 获取课程作业
+
+```http
+GET /api/courses/:courseId/homework
+```
+
+Response：
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "homework-001",
+      "courseId": "math",
+      "title": "二重积分作业",
+      "status": "in_progress",
+      "questionCount": 10,
+      "completedCount": 6,
+      "createdAt": "2026-08-30T09:00:00Z"
+    }
+  ],
+  "message": null
+}
+```
+
+作业状态：
+
+```text
+pending
+in_progress
+completed
+```
+
+---
+
+## 14.2 获取单个作业
+
+```http
+GET /api/courses/:courseId/homework/:homeworkId
+```
+
+---
+
+## 14.3 创建作业任务
+
+```http
+POST /api/courses/:courseId/homework
+```
+
+Request：
+
+```json
+{
+  "title": "二重积分作业"
+}
+```
+
+---
+
+# 15. AI Homework API
+
+真实 AI 能力暂不要求实现，但 API Contract 可以提前定义。
+
+---
+
+## 15.1 请求 AI 作业辅导
+
+```http
+POST /api/courses/:courseId/homework/:homeworkId/assist
+```
+
+Request：
+
+```json
+{
+  "questionId": "question-001",
+  "userAnswer": "..."
+}
+```
+
+Response：
+
+```json
+{
+  "success": true,
+  "data": {
+    "level": 1,
+    "type": "hint",
+    "content": "可以先考虑使用换元法。",
+    "nextAction": "continue"
+  },
+  "message": null
+}
+```
+
+提示等级：
+
+```text
+1 = 方向提示
+2 = 方法提示
+3 = 关键步骤
+4 = 完整解析
+```
+
+当前 V02：
+
+```text
+使用 Mock Response
+```
+
+---
+
+# 16. Mistakes API
+
+Course Space 中的：
+
+> **错题记录**
+
+---
+
+## 16.1 获取错题
+
+```http
+GET /api/courses/:courseId/mistakes
+```
+
+Response：
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "mistake-001",
+      "courseId": "math",
+      "questionId": "question-001",
+      "title": "二重积分计算",
+      "topic": "二重积分",
+      "difficulty": "medium",
+      "mistakeCount": 2,
+      "status": "unreviewed"
+    }
+  ],
+  "message": null
+}
+```
+
+---
+
+## 16.2 获取单个错题
+
+```http
+GET /api/courses/:courseId/mistakes/:mistakeId
+```
+
+---
+
+## 16.3 标记错题已复习
+
+```http
+PATCH /api/courses/:courseId/mistakes/:mistakeId
+```
+
+Request：
+
+```json
+{
+  "status": "reviewed"
+}
+```
+
+---
+
+# 17. Analytics API
+
+Analytics 分成：
+
+```text
+Global Analytics
+Course Analytics
+```
+
+---
+
+# 18. Global Analytics
+
+## 18.1 获取整体学习分析
+
+```http
+GET /api/analytics
+```
+
+Response：
+
+```json
+{
+  "success": true,
+  "data": {
+    "overallMastery": 68,
+    "studyHours": 24,
+    "completedTasks": 18,
+    "weakTopics": [
+      {
+        "topic": "二重积分",
+        "course": "高等数学",
+        "mastery": 42
+      }
+    ],
+    "courseMastery": [
+      {
+        "courseId": "math",
+        "courseName": "高等数学",
+        "mastery": 72
+      },
+      {
+        "courseId": "physics",
+        "courseName": "大学物理",
+        "mastery": 61
+      }
+    ],
+    "trend": []
+  },
+  "message": null
+}
+```
+
+---
+
+# 19. Course Analytics
+
+## 19.1 获取单课程学习分析
+
+```http
+GET /api/courses/:courseId/analytics
+```
+
+Response：
+
+```json
+{
+  "success": true,
+  "data": {
+    "mastery": 72,
+    "studyHours": 12,
+    "completedHomework": 8,
+    "mistakeCount": 15,
+    "weakTopics": [
+      {
+        "topic": "二重积分",
+        "mastery": 42
+      },
+      {
+        "topic": "微分方程",
+        "mastery": 51
+      }
+    ],
+    "homeworkPerformance": {
+      "accuracy": 76,
+      "completionRate": 84
+    },
+    "trend": []
+  },
+  "message": null
+}
+```
+
+---
+
+# 20. AI Learning Suggestion API
+
+Home 和 Analytics 可以使用 AI 学习建议。
+
+---
+
+## 20.1 获取学习建议
+
+```http
+GET /api/learning/suggestions
+```
+
+Response：
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "suggestion-001",
+      "type": "review",
+      "courseId": "math",
+      "title": "建议复习二重积分",
+      "description": "近期错题中二重积分占比较高。",
+      "priority": "high"
+    }
+  ],
+  "message": null
+}
+```
+
+当前阶段使用 Mock Data。
+
+---
+
+# 21. Settings API
+
+Settings 分成：
+
+```text
+学习画像
+AI 偏好
+通用设置
+```
+
+---
+
+# 22. AI Preference API
+
+## 22.1 获取 AI 偏好
+
+```http
+GET /api/settings/ai
+```
+
+Response：
+
+```json
+{
+  "success": true,
+  "data": {
+    "responseStyle": "standard",
+    "teachingMode": "hint_first",
+    "responseLength": "medium",
+    "customPrompt": ""
+  },
+  "message": null
+}
+```
+
+---
+
+## 22.2 更新 AI 偏好
+
+```http
+PATCH /api/settings/ai
+```
+
+Request：
+
+```json
+{
+  "responseStyle": "standard",
+  "teachingMode": "hint_first",
+  "responseLength": "medium",
+  "customPrompt": ""
+}
+```
+
+允许值：
+
+### responseStyle
+
+```text
+concise
+standard
+detailed
+```
+
+### teachingMode
+
+```text
+direct_answer
+hint_first
+guided_question
+teacher_style
+```
+
+### responseLength
+
+```text
+short
+medium
+long
+```
+
+---
+
+# 23. General Settings API
+
+## 23.1 获取通用设置
+
+```http
+GET /api/settings/general
+```
+
+Response：
+
+```json
+{
+  "success": true,
+  "data": {
+    "language": "zh-CN",
+    "theme": "system",
+    "notifications": true
+  },
+  "message": null
+}
+```
+
+---
+
+## 23.2 更新通用设置
+
+```http
+PATCH /api/settings/general
+```
+
+Request：
+
+```json
+{
+  "language": "zh-CN",
+  "theme": "system",
+  "notifications": true
+}
+```
+
+---
+
+# 24. AI Task API
+
+未来所有 AI 请求建议统一经过 Task API。
+
+基本结构：
+
+```text
+Frontend
     ↓
-Workflow / Router
+POST /api/ai/tasks
     ↓
-Real Service / Model
+Task Router
     ↓
+Workflow / Agent
+    ↓
+Skill / Tool
+    ↓
+Model
+```
+
+---
+
+## 24.1 创建 AI Task
+
+```http
+POST /api/ai/tasks
+```
+
+Request：
+
+```json
+{
+  "courseId": "math",
+  "type": "homework",
+  "input": {
+    "text": "请帮我分析这道题"
+  }
+}
+```
+
+Response：
+
+```json
+{
+  "success": true,
+  "data": {
+    "taskId": "task-001",
+    "status": "queued"
+  },
+  "message": null
+}
+```
+
+---
+
+# 25. AI Task 状态
+
+```http
+GET /api/ai/tasks/:taskId
+```
+
+Response：
+
+```json
+{
+  "success": true,
+  "data": {
+    "taskId": "task-001",
+    "status": "completed",
+    "result": {
+      "type": "hint",
+      "content": "可以先尝试分析积分区域。"
+    }
+  },
+  "message": null
+}
+```
+
+任务状态：
+
+```text
+queued
+processing
+completed
+failed
+```
+
+---
+
+# 26. Router 信息
+
+Lingxi-claw 的 Router 是内部实现。
+
+Frontend 默认不需要知道 Router 如何工作。
+
+但是为了：
+
+* Demo
+* 调试
+* Explainable AI
+* 后续成本 / 延迟展示
+
+可以提供可选的 routing 信息。
+
+例如：
+
+```json
+{
+  "success": true,
+  "data": {
+    "taskId": "task-001",
+    "status": "completed",
+    "result": {},
+    "routing": {
+      "scene": "course_homework",
+      "workflow": "homework",
+      "skill": "math",
+      "model": "mock-model",
+      "inputType": "text"
+    }
+  },
+  "message": null
+}
+```
+
+Frontend 不应该依赖这些字段完成核心业务。
+
+---
+
+# 27. 文件上传与 AI Task 的关系
+
+文件处理流程：
+
+```text
+Frontend
+    ↓
+Upload
+    ↓
+Material API
+    ↓
+Backend
+    ↓
+File Router
+    ↓
+Parser / OCR / Vision
+    ↓
+Structured Data
+    ↓
+Course Knowledge
+```
+
+AI Task：
+
+```text
+Frontend
+    ↓
+AI Task API
+    ↓
+Task Router
+    ↓
+Workflow / Agent
+    ↓
+Course Knowledge
+    ↓
+Model
+```
+
+二者不要混成一个 API。
+
+---
+
+# 28. API 与产品信息架构对应关系
+
+```text
+产品页面
+        API
+────────────────────────────────
+
+Onboarding
+        ↓
+/api/profile
+
+Home
+        ↓
+/api/home
+
+Courses
+        ↓
+/api/courses
+
+Course Space
+        │
+        ├── Overview
+        │      ↓
+        │  /api/courses/:courseId/overview
+        │
+        ├── Materials
+        │      ↓
+        │  /api/courses/:courseId/materials
+        │
+        ├── Homework
+        │      ↓
+        │  /api/courses/:courseId/homework
+        │
+        ├── Mistakes
+        │      ↓
+        │  /api/courses/:courseId/mistakes
+        │
+        └── Analytics
+               ↓
+           /api/courses/:courseId/analytics
+
+Analytics
+        ↓
+/api/analytics
+
+Settings
+        ├── Profile
+        │      ↓
+        │  /api/profile
+        │
+        ├── AI
+        │      ↓
+        │  /api/settings/ai
+        │
+        └── General
+               ↓
+           /api/settings/general
+```
+
+---
+
+# 29. Mock API 规范
+
+V02 阶段 Frontend 可以使用 Mock API。
+
+Mock API 必须：
+
+1. 与 API Contract 保持一致
+2. Request 参数与真实 API 一致
+3. Response 字段与真实 API 一致
+4. 不创建与 API.md 不一致的临时数据结构
+
+例如：
+
+```text
+真实：
+
+GET /api/courses
+
+Mock：
+
+mockApi.getCourses()
+```
+
+但 Mock 返回的数据结构必须与：
+
+```text
+GET /api/courses
+```
+
+完全一致。
+
+---
+
+# 30. API 类型定义
+
+Frontend 和 Backend 应尽可能共享或同步 TypeScript 类型。
+
+例如：
+
+```ts
+interface Course {
+  id: string;
+  name: string;
+  code?: string;
+  description?: string;
+  progress: number;
+  mastery: number;
+}
+```
+
+API Response：
+
+```ts
+interface ApiResponse<T> {
+  success: boolean;
+  data: T | null;
+  message: string | null;
+}
+```
+
+---
+
+# 31. 前后端协作原则
+
+## Frontend
+
+Frontend 只关心：
+
+```text
+Request
+ ↓
+Response
+ ↓
+UI
+```
+
+不应该关心：
+
+```text
+数据库怎么查
+Workflow 怎么实现
+模型怎么调用
+OCR 怎么实现
+Router 怎么实现
+```
+
+---
+
+## Backend
+
+Backend 负责：
+
+```text
+Request
+ ↓
+参数验证
+ ↓
+业务逻辑
+ ↓
+Workflow / Service / AI
+ ↓
 Response
 ```
 
-保证：
-
-> **Mock Response 与真实 Response 字段必须完全兼容。**
-
-这样前端不需要等待真实后端完成。
+Backend 不应该要求 Frontend 理解内部实现。
 
 ---
 
-# 15. Go 后端实现建议
+## QA
 
-推荐：
-
-```text
-backend/
-├── cmd/
-│   └── server/
-│       └── main.go
-│
-├── internal/
-│   ├── handler/
-│   ├── service/
-│   ├── router/
-│   ├── workflow/
-│   ├── agent/
-│   ├── model/
-│   └── repository/
-│
-└── pkg/
-```
-
-职责：
+QA 根据 API.md 验证：
 
 ```text
-handler
-    ↓
-HTTP Request / Response
-
-service
-    ↓
-具体业务逻辑
-
-router
-    ↓
-任务路由
-
-workflow
-    ↓
-业务流程
-
-agent
-    ↓
-复杂开放任务
-
-model
-    ↓
-数据结构
+URL
+Method
+Request
+Response
+Status Code
+Error Case
 ```
 
 ---
 
-# 16. Vibe Coding 前端约束
+# 32. API 修改流程
 
-前端 AI 生成代码时，必须遵守：
-
-```text
-1. 只调用 API.md 中定义的接口
-2. 不自己编造接口地址
-3. 不自己编造字段
-4. 不直接调用模型 API
-5. API Base URL 必须可配置
-6. 必须支持 Loading 状态
-7. 必须支持 Error 状态
-8. 必须支持 Mock Mode
-```
-
-推荐环境变量：
+任何接口变化必须遵循：
 
 ```text
-VITE_API_BASE_URL=http://localhost:8080
-VITE_APP_MODE=mock
-```
-
----
-
-# 17. Vibe Coding 测试约束
-
-测试 AI 生成测试时：
-
-```text
-所有 API 测试以 API.md 为准。
-```
-
-测试至少覆盖：
-
-```text
-正常请求
-空参数
-错误参数
-文件不存在
-文件格式错误
-Task 不存在
-Dataset 不存在
-部分文件解析失败
-模型不可用
-```
-
----
-
-# 18. 接口修改规则
-
-禁止：
-
-```text
-后端修改字段
-    ↓
-不通知前端
-```
-
-禁止：
-
-```text
-前端自己猜字段
-```
-
-正确流程：
-
-```text
-需要修改接口
-        ↓
+发现需求变化
+      ↓
 修改 API.md
-        ↓
-确认 Request
-        ↓
-确认 Response
-        ↓
-更新 DATA_SCHEMA.md
-        ↓
-前后端同步修改
-        ↓
-测试
+      ↓
+团队确认
+      ↓
+Backend 修改
+      ↓
+Frontend 修改
+      ↓
+QA 更新测试
+      ↓
+npm run build
+      ↓
+Integration Test
+```
+
+禁止：
+
+```text
+Backend：
+“我顺手把字段名改了。”
+```
+
+或者：
+
+```text
+Frontend：
+“这个字段没有，我自己猜一个。”
 ```
 
 ---
 
-# 19. MVP 优先级
+# 33. 当前 API 优先级
+
+由于当前只有 2 天开发时间，API 分为三个等级。
 
 ## P0：必须完成
 
 ```text
-POST /api/v1/final-sprint/datasets
+GET    /api/home
 
-POST /api/v1/final-sprint/datasets/{dataset_id}/files
+GET    /api/courses
+GET    /api/courses/:courseId
+GET    /api/courses/:courseId/overview
 
-GET /api/v1/tasks/{task_id}
+GET    /api/courses/:courseId/materials
+GET    /api/courses/:courseId/homework
+GET    /api/courses/:courseId/mistakes
+GET    /api/courses/:courseId/analytics
 
-POST /api/v1/final-sprint/datasets/{dataset_id}/analyze
+GET    /api/analytics
 
-GET /api/v1/final-sprint/datasets/{dataset_id}/analysis
-
-POST /api/v1/final-sprint/datasets/{dataset_id}/plan
-
-POST /api/v1/homework
-
-POST /api/v1/homework/{homework_id}/hint
-
-POST /api/v1/homework/{homework_id}/answer
-
-POST /api/v1/chat
+GET    /api/profile
+GET    /api/settings/ai
+GET    /api/settings/general
 ```
+
+这些接口主要用于让 V02 页面可以完整展示。
 
 ---
 
-## P1：建议完成
+## P1：第二优先级
 
 ```text
-GET /api/v1/final-sprint/datasets/{dataset_id}/plan
+POST   /api/courses
 
-POST /api/v1/final-sprint/datasets/{dataset_id}/practice
+PATCH  /api/courses/:courseId
 
-POST /api/v1/practice/{session_id}/answer
+POST   /api/courses/:courseId/materials
 
-GET /api/v1/settings/agent
+POST   /api/courses/:courseId/homework
 
-PUT /api/v1/settings/agent
+PATCH  /api/courses/:courseId/mistakes/:mistakeId
+
+PATCH  /api/profile
+
+PATCH  /api/settings/ai
+
+PATCH  /api/settings/general
 ```
+
+用于基本交互。
 
 ---
 
-## P2：演示增强
+## P2：后续 AI 联调
 
 ```text
-GET /api/v1/demo/metrics
+POST   /api/ai/tasks
+
+GET    /api/ai/tasks/:taskId
+
+POST   /api/courses/:courseId/homework/:homeworkId/assist
 ```
+
+这些接口可以先定义 Contract，暂时使用 Mock。
 
 ---
 
-# 20. 最终接口调用关系
+# 34. 当前禁止事项
+
+当前阶段禁止因为实现 API 而：
 
 ```text
-Frontend
-    │
-    │ HTTP API
+❌ 删除已有 services
+❌ 删除已有 API Types
+❌ 删除 Mock API
+❌ 删除 LegacyApp
+❌ 重写整个 Frontend
+❌ 重写整个 Backend
+❌ 提前接入真实模型
+❌ 为了一个页面创建复杂的新架构
+```
+
+如果发现现有 API 与新产品架构冲突：
+
+```text
+先记录
     ↓
-Go Backend
-    │
-    ├── Handler
-    │
-    ├── Workflow
-    │
-    ├── Router
-    │
-    ├── Agent
-    │
-    └── Service
-            │
-            ├── File Parser
-            ├── OCR
-            ├── Knowledge Base
-            ├── Model API
-            └── Mock Service
-                    │
-                    ↓
-                 Response
-                    │
-                    ↓
-                 Frontend
+修改 API.md
+    ↓
+团队确认
+    ↓
+再修改代码
 ```
 
 ---
 
-# 21. 团队最重要的约定
+# 35. API Contract 最终目标
 
-> **API.md 是前端、后端和测试之间的唯一接口标准。**
-
-对于 API：
+Lingxi-claw 的 API 应最终形成：
 
 ```text
-前端以 API.md 为准
-后端以 API.md 为准
-测试以 API.md 为准
-Vibe Coding Prompt 以 API.md 为上下文
+                         Frontend
+                            │
+                            │ API
+                            ↓
+                    ┌──────────────┐
+                    │    Backend   │
+                    └──────┬───────┘
+                           │
+             ┌─────────────┼─────────────┐
+             ↓             ↓             ↓
+          Course        Learning       AI Task
+           Service       Service       Service
+             │             │             │
+             ↓             ↓             ↓
+         Materials      Analytics    Router
+         Homework       Mistakes       │
+         Course Data    Records        ↓
+                                  Workflow / Agent
+                                        │
+                                        ↓
+                                   Skill / Model
 ```
 
-任何代码与 API.md 不一致时：
+---
 
-> **优先修正文档或统一修改代码，不能各自维护不同版本。**
+# 36. 一句话总结
+
+> **API.md 是 Lingxi-claw 前端、后端和测试之间的接口合同。当前 V02 以 Course / Course Space 为核心组织 API，优先保证页面和 Mock 联调；未来再通过统一的 AI Task API 接入 Workflow、Router、Agent、Skill 和 Model，而不让前端直接依赖 AI 内部实现。**

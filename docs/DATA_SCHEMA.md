@@ -1,14 +1,6 @@
-# Lingxi-claw Data Schema
+# Study with Lingxi-claw - Data Schema 数据结构定义
 
-> Version: v0.1.0  
-> Status: Hackathon MVP  
-> Backend: Go  
-> API Data Format: JSON  
-> Naming Convention: snake_case
-
----
-
-# 1. 文档目的
+## 1. 文档目的
 
 本文档定义 Lingxi-claw 项目中的核心数据结构。
 
@@ -22,7 +14,7 @@ Router
 Agent
 Mock Data
 Test
-````
+```
 
 都应该尽量使用本文档定义的数据结构。
 
@@ -68,1678 +60,1643 @@ API Response
 
 ---
 
-# 2. 命名规范
+# 2. 当前阶段说明
 
-## 2.1 API JSON
+当前项目处于 **V02 页面架构 + 前后端协作 + Mock 联调阶段**。
 
-所有 JSON 字段使用：
+当前数据结构的主要目标不是建立完整数据库，而是：
 
 ```text
-snake_case
+统一 Frontend / Backend / Mock / Test 的数据格式
 ```
 
-正确：
+因此当前阶段：
 
-```json
-{
-  "dataset_id": "ds_001",
-  "file_count": 5,
-  "created_at": "2026-08-22T10:00:00Z"
-}
+```text
+✅ 定义核心 Entity
+✅ 定义 TypeScript 类型
+✅ 定义 Mock Data 结构
+✅ 定义 API Request / Response 使用的数据
 ```
 
-错误：
+暂不要求：
 
-```json
-{
-  "datasetId": "ds_001",
-  "fileCount": 5
-}
+```text
+❌ 完整数据库设计
+❌ 真实用户认证系统
+❌ 真实 AI 数据持久化
+❌ 真实向量数据库
+❌ 复杂知识图谱
+❌ 完整学习行为数据仓库
+```
+
+未来 Backend 可以根据实际数据库选型，将本文档中的逻辑数据结构映射到具体数据库。
+
+---
+
+# 3. 核心数据模型
+
+Lingxi-claw 当前核心数据关系：
+
+```text
+User
+ │
+ ├── LearningProfile
+ │
+ ├── AIPreference
+ │
+ ├── GeneralSettings
+ │
+ └── Courses
+       │
+       └── Course
+             │
+             ├── CourseOverview
+             │
+             ├── CourseMaterial
+             │
+             ├── Homework
+             │
+             ├── Mistake
+             │
+             ├── LearningRecord
+             │
+             └── CourseAnalytics
+```
+
+整体关系：
+
+```text
+                       User
+                         │
+          ┌──────────────┼──────────────┐
+          ↓              ↓              ↓
+ LearningProfile   AIPreference   GeneralSettings
+                         │
+                         ↓
+                      Courses
+                         │
+                         ↓
+                    Course Space
+                         │
+       ┌─────────────────┼─────────────────┐
+       ↓                 ↓                 ↓
+   Materials         Homework           Mistakes
+       │                 │                 │
+       └─────────────────┼─────────────────┘
+                         ↓
+                  Course Analytics
 ```
 
 ---
 
-## 2.2 ID 命名
+# 4. ID 规范
 
-不同对象使用不同前缀。
+所有核心 Entity 必须具有唯一 `id`。
+
+统一使用：
+
+```ts
+id: string
+```
+
+例如：
 
 ```text
-dataset_id      ds_
-file_id         file_
-task_id         task_
-question_id     q_
-plan_id         plan_
-session_id      practice_
-homework_id     hw_
-message_id      msg_
+user-001
+course-math
+material-001
+homework-001
+mistake-001
+task-001
+```
+
+当前 Mock 环境可以使用字符串 ID。
+
+未来 Backend 可以映射为：
+
+```text
+UUID
+数据库自增 ID
+Snowflake ID
+```
+
+但 Frontend 不应该依赖 ID 的具体生成方式。
+
+---
+
+# 5. User
+
+User 表示系统用户。
+
+```ts
+interface User {
+  id: string;
+  name: string;
+  avatar?: string;
+  createdAt: string;
+  updatedAt: string;
+}
 ```
 
 示例：
 
-```text
-ds_001
-file_001
-task_001
-q_001
-practice_001
-hw_001
-```
-
----
-
-## 2.3 时间格式
-
-所有时间使用 ISO 8601。
-
-```text
-2026-08-22T10:30:00Z
-```
-
-推荐 Go 后端使用：
-
-```go
-time.Time
-```
-
-JSON 输出统一为：
-
-```text
-RFC3339
-```
-
----
-
-# 3. 通用 API Response
-
-所有 API 使用统一响应结构。
-
-## 3.1 成功响应
-
 ```json
 {
-  "success": true,
-  "data": {},
-  "error": null
+  "id": "user-001",
+  "name": "Student",
+  "avatar": "",
+  "createdAt": "2026-08-30T09:00:00Z",
+  "updatedAt": "2026-08-30T09:00:00Z"
 }
 ```
 
 ---
 
-## 3.2 失败响应
+# 6. LearningProfile
+
+LearningProfile 对应产品中的：
+
+> 首次进入 / 学习画像
+
+包括：
+
+```text
+专业
+学习习惯
+作业习惯
+AI 使用习惯
+学习目标
+```
+
+数据结构：
+
+```ts
+interface LearningProfile {
+  userId: string;
+  major: string;
+  learningHabits: string[];
+  homeworkHabits: string[];
+  aiUsageHabits: string[];
+  learningGoals: string[];
+  completed: boolean;
+  updatedAt: string;
+}
+```
+
+示例：
 
 ```json
 {
-  "success": false,
-  "data": null,
-  "error": {
-    "code": "INVALID_REQUEST",
-    "message": "请求参数错误"
-  }
+  "userId": "user-001",
+  "major": "软件工程",
+  "learningHabits": [
+    "晚上学习",
+    "集中学习"
+  ],
+  "homeworkHabits": [
+    "先自己尝试"
+  ],
+  "aiUsageHabits": [
+    "概念解释",
+    "作业辅导"
+  ],
+  "learningGoals": [
+    "提高课程成绩"
+  ],
+  "completed": true,
+  "updatedAt": "2026-08-30T09:00:00Z"
 }
 ```
 
 ---
 
-# 4. Error
+# 7. AIPreference
 
-表示 API 错误信息。
+对应：
 
-```json
-{
-  "code": "INVALID_FILE",
-  "message": "不支持该文件格式"
+> Settings → AI 偏好
+
+```ts
+interface AIPreference {
+  userId: string;
+  responseStyle: ResponseStyle;
+  teachingMode: TeachingMode;
+  responseLength: ResponseLength;
+  customPrompt?: string;
+  updatedAt: string;
 }
 ```
 
-字段定义：
+## 7.1 ResponseStyle
 
-| 字段      | 类型     | 描述       |
-| ------- | ------ | -------- |
-| code    | string | 机器可识别错误码 |
-| message | string | 用户可读错误信息 |
+```ts
+type ResponseStyle =
+  | "concise"
+  | "standard"
+  | "detailed";
+```
 
-推荐错误码：
+对应：
 
 ```text
-INVALID_REQUEST
-INVALID_FILE
-FILE_TOO_LARGE
-FILE_PARSE_ERROR
-DATASET_NOT_FOUND
-FILE_NOT_FOUND
-TASK_NOT_FOUND
-QUESTION_NOT_FOUND
-HOMEWORK_NOT_FOUND
-SESSION_NOT_FOUND
-MODEL_UNAVAILABLE
-INTERNAL_ERROR
+极速简洁
+标准讲解
+详细推导
 ```
 
 ---
 
-# 5. Dataset
+## 7.2 TeachingMode
 
-Dataset 表示一次完整的课程复习资料集合。
-
-例如：
-
-```text
-概率论期末突击
-│
-├── 2023期末试卷.pdf
-├── 2024期末试卷.docx
-├── 2025期末试卷.pdf
-└── 教师复习资料.pdf
+```ts
+type TeachingMode =
+  | "direct_answer"
+  | "hint_first"
+  | "guided_question"
+  | "teacher_style";
 ```
 
-对应一个 Dataset。
+对应：
+
+```text
+直接给出答案
+先提示，再给答案
+通过提问引导思考
+像老师一样详细讲解
+```
 
 ---
 
-## Schema
+## 7.3 ResponseLength
 
-```json
-{
-  "dataset_id": "ds_001",
-  "name": "概率论期末突击",
-  "course": "概率论",
-  "file_count": 4,
-  "status": "ready",
-  "created_at": "2026-08-22T10:00:00Z",
-  "updated_at": "2026-08-22T10:30:00Z"
+```ts
+type ResponseLength =
+  | "short"
+  | "medium"
+  | "long";
+```
+
+---
+
+# 8. GeneralSettings
+
+对应：
+
+> Settings → 通用设置
+
+```ts
+interface GeneralSettings {
+  userId: string;
+  language: string;
+  theme: "light" | "dark" | "system";
+  notifications: boolean;
+  updatedAt: string;
 }
 ```
 
-字段：
-
-| 字段         | 类型      | 描述            |
-| ---------- | ------- | ------------- |
-| dataset_id | string  | Dataset 唯一 ID |
-| name       | string  | 复习任务名称        |
-| course     | string  | 课程名称          |
-| file_count | integer | 文件数量          |
-| status     | string  | 当前状态          |
-| created_at | string  | 创建时间          |
-| updated_at | string  | 更新时间          |
-
 ---
 
-## Dataset Status
+# 9. Course
+
+Course 是当前产品最重要的核心实体。
+
+用户进入：
 
 ```text
-created
-processing
-ready
-failed
-```
-
-状态流：
-
-```text
-created
+我的课程
     ↓
-processing
+高等数学
     ↓
-ready
+Course Space
 ```
 
-如果失败：
+因此其他课程相关数据都应该通过：
 
 ```text
-processing
-    ↓
-failed
+courseId
 ```
 
----
+与 Course 建立关系。
 
-# 6. StudyFile
-
-StudyFile 表示 Dataset 中的一个文件。
-
-例如：
-
-```text
-2024年概率论期末试卷.pdf
-```
-
----
-
-## Schema
-
-```json
-{
-  "file_id": "file_001",
-  "dataset_id": "ds_001",
-  "file_name": "2024概率论期末试卷.pdf",
-  "file_type": "pdf",
-  "file_size": 2048000,
-  "source_type": "exam_paper",
-  "parse_status": "completed",
-  "question_count": 20,
-  "created_at": "2026-08-22T10:00:00Z"
+```ts
+interface Course {
+  id: string;
+  userId: string;
+  name: string;
+  code?: string;
+  description?: string;
+  progress: number;
+  mastery: number;
+  createdAt: string;
+  updatedAt: string;
 }
 ```
 
-字段：
-
-| 字段             | 类型      | 描述            |
-| -------------- | ------- | ------------- |
-| file_id        | string  | 文件 ID         |
-| dataset_id     | string  | 所属 Dataset    |
-| file_name      | string  | 原始文件名         |
-| file_type      | string  | 文件格式          |
-| file_size      | integer | 文件大小，单位 bytes |
-| source_type    | string  | 文件用途          |
-| parse_status   | string  | 解析状态          |
-| question_count | integer | 识别出的题目数量      |
-| created_at     | string  | 上传时间          |
-
----
-
-## File Type
-
-```text
-pdf
-docx
-image
-```
-
-图片包括：
-
-```text
-jpg
-jpeg
-png
-webp
-```
-
----
-
-## Source Type
-
-```text
-exam_paper
-review_material
-homework
-other
-```
-
-含义：
-
-```text
-exam_paper
-    往年题 / 考试题
-
-review_material
-    教师复习资料 / 课程资料
-
-homework
-    日常作业
-
-other
-    其它学习资料
-```
-
----
-
-## Parse Status
-
-```text
-pending
-processing
-completed
-failed
-```
-
----
-
-# 7. Task
-
-Task 表示异步处理任务。
-
-适用于：
-
-```text
-批量文件解析
-OCR
-题目提取
-题型分类
-历年题分析
-复习计划生成
-```
-
----
-
-## Schema
+示例：
 
 ```json
 {
-  "task_id": "task_001",
-  "type": "file_processing",
-  "status": "processing",
-  "progress": 65,
-  "message": "正在分析第 3 个文件",
-  "processed_items": 3,
-  "total_items": 5,
-  "result": null,
-  "created_at": "2026-08-22T10:00:00Z",
-  "updated_at": "2026-08-22T10:01:00Z"
+  "id": "math",
+  "userId": "user-001",
+  "name": "高等数学",
+  "code": "MATH101",
+  "description": "大学高等数学课程",
+  "progress": 68,
+  "mastery": 72,
+  "createdAt": "2026-08-01T09:00:00Z",
+  "updatedAt": "2026-08-30T09:00:00Z"
 }
 ```
 
-字段：
-
-| 字段              | 类型          | 描述       |
-| --------------- | ----------- | -------- |
-| task_id         | string      | Task ID  |
-| type            | string      | 任务类型     |
-| status          | string      | 任务状态     |
-| progress        | integer     | 进度，0-100 |
-| message         | string      | 当前任务信息   |
-| processed_items | integer     | 已处理数量    |
-| total_items     | integer     | 总数量      |
-| result          | object/null | 完成后的结果   |
-| created_at      | string      | 创建时间     |
-| updated_at      | string      | 更新时间     |
-
 ---
 
-## Task Type
+# 10. Course Space
+
+Course Space 不是独立数据库实体，而是：
+
+> **以 Course 为核心组织的一组学习数据和功能上下文。**
+
+结构：
 
 ```text
-file_processing
-ocr
-question_extraction
-exam_analysis
-study_plan
-homework_analysis
+Course Space
+ │
+ ├── Overview
+ ├── Materials
+ ├── Homework
+ ├── Mistakes
+ └── Analytics
+```
+
+统一通过：
+
+```ts
+courseId: string
+```
+
+关联。
+
+因此：
+
+```text
+Course
+    │
+    ├── courseId
+    │
+    ├── Materials
+    ├── Homework
+    ├── Mistakes
+    └── Analytics
 ```
 
 ---
 
-## Task Status
+# 11. CourseOverview
 
-```text
-pending
-processing
-completed
-failed
-partial_success
+Course Overview 是 Course Space 的首页数据。
+
+```ts
+interface CourseOverview {
+  courseId: string;
+  progress: number;
+  mastery: number;
+  todayTasks: number;
+  completedTasks: number;
+  pendingHomework: number;
+  mistakeCount: number;
+  weakTopics: WeakTopic[];
+  recentActivities: LearningActivity[];
+}
 ```
 
 ---
 
-# 8. Question
+# 12. CourseMaterial
 
-Question 是系统中的核心对象。
+CourseMaterial 表示课程资料知识库中的一个资料。
 
-无论题目来自：
+支持：
 
 ```text
-往年题
-日常作业
 PDF
-Word
-图片
-OCR
+DOCX
+JPG
+PNG
 ```
 
-最终都尽量转换为统一的 Question。
+数据结构：
 
----
-
-## Schema
-
-```json
-{
-  "question_id": "q_001",
-  "dataset_id": "ds_001",
-  "file_id": "file_001",
-  "content": "计算以下二重积分……",
-  "question_type": "calculation",
-  "knowledge_points": [
-    "二重积分",
-    "积分区域"
-  ],
-  "difficulty": "medium",
-  "source_year": 2024,
-  "source_page": 2,
-  "source_type": "exam_paper"
-}
-```
-
-字段：
-
-| 字段               | 类型           | 描述    |
-| ---------------- | ------------ | ----- |
-| question_id      | string       | 题目 ID |
-| dataset_id       | string       | 所属资料集 |
-| file_id          | string       | 来源文件  |
-| content          | string       | 题目内容  |
-| question_type    | string       | 题型    |
-| knowledge_points | array        | 知识点   |
-| difficulty       | string       | 难度    |
-| source_year      | integer/null | 来源年份  |
-| source_page      | integer/null | 来源页码  |
-| source_type      | string       | 来源类型  |
-
----
-
-## Question Type
-
-MVP 第一版统一使用：
-
-```text
-choice
-fill_blank
-calculation
-proof
-application
-short_answer
-other
-```
-
-注意：
-
-不同课程题型可能不同。
-
-例如：
-
-```text
-高数
-├── calculation
-├── proof
-└── application
-
-概率论
-├── calculation
-├── choice
-└── proof
-
-程序设计
-├── coding
-├── debugging
-└── theory
-```
-
-MVP 阶段可以先使用通用分类。
-
----
-
-## Difficulty
-
-```text
-easy
-medium
-hard
-```
-
----
-
-# 9. KnowledgePoint
-
-KnowledgePoint 表示知识点。
-
-例如：
-
-```text
-概率论
-├── 条件概率
-├── 贝叶斯公式
-├── 全概率公式
-└── 随机变量
-```
-
----
-
-## Schema
-
-```json
-{
-  "knowledge_point_id": "kp_001",
-  "name": "贝叶斯公式",
-  "course": "概率论",
-  "description": "用于根据条件概率反推事件概率"
-}
-```
-
-字段：
-
-| 字段                 | 类型     | 描述     |
-| ------------------ | ------ | ------ |
-| knowledge_point_id | string | 知识点 ID |
-| name               | string | 知识点名称  |
-| course             | string | 所属课程   |
-| description        | string | 简单描述   |
-
----
-
-# 10. ExamAnalysis
-
-ExamAnalysis 表示对 Dataset 中往年题的综合分析结果。
-
-这是：
-
-```text
-期末突击
-```
-
-最核心的输出之一。
-
----
-
-## Schema
-
-```json
-{
-  "analysis_id": "analysis_001",
-  "dataset_id": "ds_001",
-  "course": "概率论",
-  "total_files": 5,
-  "total_questions": 120,
-  "knowledge_points": [
-    {
-      "name": "贝叶斯公式",
-      "frequency": 15,
-      "importance": "high",
-      "difficulty": "medium"
-    },
-    {
-      "name": "随机变量",
-      "frequency": 12,
-      "importance": "high",
-      "difficulty": "high"
-    }
-  ],
-  "question_types": [
-    {
-      "name": "calculation",
-      "count": 65,
-      "percentage": 54.2
-    },
-    {
-      "name": "proof",
-      "count": 20,
-      "percentage": 16.7
-    }
-  ],
-  "summary": "贝叶斯公式、随机变量和数字特征是近几年出现频率较高的重点内容。",
-  "created_at": "2026-08-22T11:00:00Z"
+```ts
+interface CourseMaterial {
+  id: string;
+  courseId: string;
+  name: string;
+  type: MaterialType;
+  size?: number;
+  status: MaterialStatus;
+  url?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 ```
 
 ---
 
-## Importance
+## 12.1 MaterialType
 
-```text
-high
-medium
-low
+```ts
+type MaterialType =
+  | "pdf"
+  | "docx"
+  | "jpg"
+  | "png";
 ```
 
 ---
 
-# 11. StudyProfile
+## 12.2 MaterialStatus
 
-StudyProfile 表示生成复习计划时用户提供的学习情况。
-
----
-
-## Schema
-
-```json
-{
-  "exam_date": "2026-08-30",
-  "daily_study_hours": 4,
-  "current_level": "medium"
-}
+```ts
+type MaterialStatus =
+  | "uploaded"
+  | "processing"
+  | "ready"
+  | "failed";
 ```
 
-字段：
-
-| 字段                | 类型     | 描述     |
-| ----------------- | ------ | ------ |
-| exam_date         | string | 考试日期   |
-| daily_study_hours | number | 每日学习时间 |
-| current_level     | string | 当前水平   |
-
----
-
-## Current Level
-
-```text
-low
-medium
-high
-```
-
----
-
-# 12. StudyPlan
-
-StudyPlan 表示根据：
-
-```text
-剩余时间
-+
-用户水平
-+
-每日学习时间
-+
-历年题分析
-```
-
-生成的个性化复习计划。
-
----
-
-## Schema
-
-```json
-{
-  "plan_id": "plan_001",
-  "dataset_id": "ds_001",
-  "days_remaining": 7,
-  "daily_study_hours": 4,
-  "daily_plan": [
-    {
-      "day": 1,
-      "date": "2026-08-23",
-      "focus": [
-        "条件概率",
-        "贝叶斯公式"
-      ],
-      "practice_count": 20,
-      "estimated_hours": 4,
-      "priority": "high"
-    },
-    {
-      "day": 2,
-      "date": "2026-08-24",
-      "focus": [
-        "随机变量"
-      ],
-      "practice_count": 15,
-      "estimated_hours": 4,
-      "priority": "high"
-    }
-  ],
-  "created_at": "2026-08-22T11:30:00Z"
-}
-```
-
----
-
-# 13. StudyPlanDay
-
-StudyPlan 中的单日计划。
-
-```json
-{
-  "day": 1,
-  "date": "2026-08-23",
-  "focus": [
-    "贝叶斯公式"
-  ],
-  "practice_count": 20,
-  "estimated_hours": 4,
-  "priority": "high"
-}
-```
-
----
-
-# 14. PracticeSession
-
-PracticeSession 表示一次刷题会话。
-
----
-
-## Schema
-
-```json
-{
-  "session_id": "practice_001",
-  "dataset_id": "ds_001",
-  "knowledge_points": [
-    "贝叶斯公式"
-  ],
-  "question_count": 5,
-  "difficulty": "medium",
-  "status": "active",
-  "questions": [
-    "q_001",
-    "q_002",
-    "q_003"
-  ],
-  "created_at": "2026-08-22T12:00:00Z"
-}
-```
-
----
-
-## Session Status
-
-```text
-active
-completed
-abandoned
-```
-
----
-
-# 15. PracticeAnswer
-
-表示用户对一道练习题的回答。
-
----
-
-## Schema
-
-```json
-{
-  "answer_id": "answer_001",
-  "session_id": "practice_001",
-  "question_id": "q_001",
-  "user_answer": "用户输入的答案",
-  "correct": false,
-  "score": 0.6,
-  "feedback": "积分区域判断正确，但是上下限设置错误。",
-  "knowledge_gaps": [
-    "积分区域转换"
-  ],
-  "submitted_at": "2026-08-22T12:10:00Z"
-}
-```
-
----
-
-# 16. Homework
-
-Homework 表示一次用户上传的日常作业。
-
----
-
-## Schema
-
-```json
-{
-  "homework_id": "hw_001",
-  "course": "高等数学",
-  "file_id": "file_010",
-  "status": "analyzed",
-  "question_count": 5,
-  "created_at": "2026-08-22T14:00:00Z"
-}
-```
-
----
-
-## Homework Status
+文件处理流程：
 
 ```text
 uploaded
+    ↓
 processing
-analyzed
+    ↓
+ready
+```
+
+失败：
+
+```text
+processing
+    ↓
 failed
 ```
 
 ---
 
-# 17. HomeworkQuestion
+# 13. Homework
 
-Homework 中识别出的题目。
+Homework 表示课程中的一个作业任务。
 
-```json
-{
-  "question_id": "q_hw_001",
-  "homework_id": "hw_001",
-  "content": "计算以下积分……",
-  "question_type": "calculation",
-  "knowledge_points": [
-    "不定积分"
-  ],
-  "difficulty": "medium"
+```ts
+interface Homework {
+  id: string;
+  courseId: string;
+  title: string;
+  status: HomeworkStatus;
+  questionCount: number;
+  completedCount: number;
+  createdAt: string;
+  updatedAt: string;
 }
 ```
 
 ---
 
-# 18. HintRequest
+## 13.1 HomeworkStatus
 
-表示用户请求解题帮助。
-
-注意：
-
-Lingxi-claw 的作业辅助核心策略是：
-
-> 默认不给完整答案，优先帮助用户自己完成。
+```ts
+type HomeworkStatus =
+  | "pending"
+  | "in_progress"
+  | "completed";
+```
 
 ---
 
-## Schema
+# 14. HomeworkQuestion
 
-```json
-{
-  "question_id": "q_hw_001",
-  "user_message": "我不知道第一步怎么做",
-  "help_level": "direction"
+如果一个 Homework 包含多道题，则使用 HomeworkQuestion。
+
+```ts
+interface HomeworkQuestion {
+  id: string;
+  homeworkId: string;
+  courseId: string;
+  content: string;
+  type?: QuestionType;
+  topic?: string;
+  userAnswer?: string;
+  status: QuestionStatus;
 }
 ```
 
 ---
 
-## Help Level
+## 14.1 QuestionType
 
-```text
-direction
-method
-step
-full_solution
-```
+当前允许：
 
-含义：
-
-```text
-direction
-    只告诉思考方向
-
-method
-    告诉使用什么方法
-
-step
-    分步骤指导
-
-full_solution
-    给出完整解答
-```
-
-默认：
-
-```text
-direction
+```ts
+type QuestionType =
+  | "calculation"
+  | "proof"
+  | "concept"
+  | "programming"
+  | "multiple_choice"
+  | "other";
 ```
 
 ---
 
-# 19. HomeworkFeedback
+## 14.2 QuestionStatus
 
-表示系统对用户答案的反馈。
+```ts
+type QuestionStatus =
+  | "pending"
+  | "attempting"
+  | "submitted"
+  | "completed";
+```
 
 ---
 
-## Schema
+# 15. Mistake
 
-```json
-{
-  "question_id": "q_hw_001",
-  "correct": false,
-  "score": 0.6,
-  "feedback": [
-    {
-      "step": 1,
-      "correct": true,
-      "message": "第一步判断正确"
-    },
-    {
-      "step": 2,
-      "correct": false,
-      "message": "这里计算符号错误"
-    }
-  ],
-  "final_answer": "正确答案",
-  "summary": "你的方法是正确的，主要问题出现在第二步计算。"
-}
-```
+Mistake 表示用户的一条错题记录。
 
-注意：
-
-`final_answer` 在提示阶段可以为空。
-
-```json
-{
-  "final_answer": null
-}
-```
-
-只有：
-
-```text
-用户主动提交答案
-```
-
-或者：
-
-```text
-用户明确请求完整答案
-```
-
-时才返回。
-
----
-
-# 20. AgentSettings
-
-AgentSettings 表示用户对 AI 学习助手行为的设置。
-
----
-
-## Schema
-
-```json
-{
-  "response_style": "detailed",
-  "personality": "encouraging",
-  "answer_policy": "hint_first"
+```ts
+interface Mistake {
+  id: string;
+  courseId: string;
+  questionId?: string;
+  title: string;
+  content?: string;
+  topic: string;
+  difficulty: Difficulty;
+  mistakeCount: number;
+  status: MistakeStatus;
+  createdAt: string;
+  updatedAt: string;
 }
 ```
 
 ---
 
-## Response Style
+## 15.1 Difficulty
 
-```text
-concise
-normal
-detailed
+```ts
+type Difficulty =
+  | "easy"
+  | "medium"
+  | "hard";
 ```
 
 ---
 
-## Personality
+## 15.2 MistakeStatus
 
-```text
-encouraging
-strict
-friendly
-professional
+```ts
+type MistakeStatus =
+  | "unreviewed"
+  | "reviewed";
 ```
 
 ---
 
-## Answer Policy
+# 16. LearningRecord
 
-```text
-hint_first
-balanced
-direct_answer
-```
+LearningRecord 用于记录用户的学习活动。
 
-默认：
-
-```text
-hint_first
-```
-
----
-
-# 21. ChatMessage
-
-表示通用 Agent 的一次消息。
-
----
-
-## Schema
-
-```json
-{
-  "message_id": "msg_001",
-  "role": "user",
-  "content": "什么是贝叶斯公式？",
-  "created_at": "2026-08-22T15:00:00Z"
-}
-```
-
-AI 回复：
-
-```json
-{
-  "message_id": "msg_002",
-  "role": "assistant",
-  "content": "贝叶斯公式用于……",
-  "created_at": "2026-08-22T15:00:02Z"
+```ts
+interface LearningRecord {
+  id: string;
+  userId: string;
+  courseId?: string;
+  type: LearningRecordType;
+  duration?: number;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
 }
 ```
 
 ---
 
-## Role
+## 16.1 LearningRecordType
 
-```text
-user
-assistant
-system
+```ts
+type LearningRecordType =
+  | "study"
+  | "homework"
+  | "review"
+  | "mistake_review"
+  | "material_read"
+  | "ai_assist";
 ```
 
 ---
 
-# 22. RoutingInfo
+# 17. LearningActivity
 
-RoutingInfo 是 Lingxi-claw 的核心技术数据结构之一。
+用于 Course Overview 中的最近活动。
 
-它记录：
-
-```text
-用户请求
-    ↓
-前置分类
-    ↓
-Workflow / Agent
-    ↓
-文件路由
-    ↓
-任务路由
-    ↓
-模型路由
-```
-
-最终系统是如何处理这个请求的。
-
----
-
-## Schema
-
-```json
-{
-  "input_type": "file_and_text",
-  "intent": "final_sprint",
-  "handler_type": "workflow",
-  "handler": "final_sprint_workflow",
-  "file_route": "ocr",
-  "complexity": "medium",
-  "model_route": "lightweight_model",
-  "fallback": false
+```ts
+interface LearningActivity {
+  id: string;
+  courseId: string;
+  type: LearningRecordType;
+  title: string;
+  description?: string;
+  createdAt: string;
 }
 ```
 
-字段：
+示例：
 
-| 字段           | 类型          | 描述               |
-| ------------ | ----------- | ---------------- |
-| input_type   | string      | 输入类型             |
-| intent       | string      | 用户意图             |
-| handler_type | string      | Workflow 或 Agent |
-| handler      | string      | 实际处理器            |
-| file_route   | string/null | 文件处理路径           |
-| complexity   | string      | 任务复杂度            |
-| model_route  | string      | 模型路由结果           |
-| fallback     | boolean     | 是否发生降级           |
-
----
-
-## Input Type
-
-```text
-text
-file
-image
-file_and_text
-image_and_text
+```json
+{
+  "id": "activity-001",
+  "courseId": "math",
+  "type": "mistake_review",
+  "title": "复习了二重积分错题",
+  "description": "完成 3 道错题复习",
+  "createdAt": "2026-08-30T10:00:00Z"
+}
 ```
 
 ---
 
-## Intent
+# 18. Analytics
+
+Analytics 是产品中的学习分析数据。
+
+分为：
 
 ```text
-final_sprint
-homework
-general
-agent_settings
-unknown
+Global Analytics
+Course Analytics
 ```
 
 ---
 
-## Handler Type
+# 19. GlobalAnalytics
 
-```text
-workflow
-agent
+对应：
+
+> 学习分析 → 整体学习情况
+
+```ts
+interface GlobalAnalytics {
+  userId: string;
+  overallMastery: number;
+  studyHours: number;
+  completedTasks: number;
+  weakTopics: WeakTopic[];
+  courseMastery: CourseMastery[];
+  trend: LearningTrend[];
+}
 ```
 
-核心逻辑：
+---
+
+# 20. CourseAnalytics
+
+对应 Course Space：
+
+> 学习分析
+
+```ts
+interface CourseAnalytics {
+  courseId: string;
+  mastery: number;
+  studyHours: number;
+  completedHomework: number;
+  mistakeCount: number;
+  weakTopics: WeakTopic[];
+  homeworkPerformance: HomeworkPerformance;
+  trend: LearningTrend[];
+}
+```
+
+---
+
+# 21. WeakTopic
+
+用于表示用户薄弱知识点。
+
+```ts
+interface WeakTopic {
+  topic: string;
+  courseId?: string;
+  courseName?: string;
+  mastery: number;
+}
+```
+
+示例：
+
+```json
+{
+  "topic": "二重积分",
+  "courseId": "math",
+  "courseName": "高等数学",
+  "mastery": 42
+}
+```
+
+---
+
+# 22. CourseMastery
+
+用于整体学习分析中的课程掌握度。
+
+```ts
+interface CourseMastery {
+  courseId: string;
+  courseName: string;
+  mastery: number;
+}
+```
+
+---
+
+# 23. HomeworkPerformance
+
+```ts
+interface HomeworkPerformance {
+  accuracy: number;
+  completionRate: number;
+}
+```
+
+---
+
+# 24. LearningTrend
+
+用于学习趋势图表。
+
+```ts
+interface LearningTrend {
+  date: string;
+  studyHours?: number;
+  mastery?: number;
+  completedTasks?: number;
+}
+```
+
+示例：
+
+```json
+[
+  {
+    "date": "2026-08-26",
+    "studyHours": 2,
+    "mastery": 61
+  },
+  {
+    "date": "2026-08-27",
+    "studyHours": 3,
+    "mastery": 64
+  },
+  {
+    "date": "2026-08-28",
+    "studyHours": 4,
+    "mastery": 68
+  }
+]
+```
+
+---
+
+# 25. LearningSuggestion
+
+用于 Home 和 Analytics 中的：
+
+> AI 学习建议
+
+```ts
+interface LearningSuggestion {
+  id: string;
+  type: SuggestionType;
+  courseId?: string;
+  title: string;
+  description: string;
+  priority: SuggestionPriority;
+}
+```
+
+---
+
+## 25.1 SuggestionType
+
+```ts
+type SuggestionType =
+  | "review"
+  | "homework"
+  | "study"
+  | "mistake"
+  | "course";
+```
+
+---
+
+## 25.2 SuggestionPriority
+
+```ts
+type SuggestionPriority =
+  | "low"
+  | "medium"
+  | "high";
+```
+
+---
+
+# 26. AI Task
+
+AI Task 用于未来统一承载 AI 请求。
+
+当前阶段可以使用 Mock。
+
+```ts
+interface AITask {
+  taskId: string;
+  userId: string;
+  courseId?: string;
+  type: AITaskType;
+  status: AITaskStatus;
+  input: AITaskInput;
+  result?: AITaskResult;
+  routing?: RoutingInfo;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+---
+
+# 27. AITaskType
+
+```ts
+type AITaskType =
+  | "homework"
+  | "question"
+  | "explanation"
+  | "analysis"
+  | "study_plan"
+  | "general";
+```
+
+---
+
+# 28. AITaskStatus
+
+```ts
+type AITaskStatus =
+  | "queued"
+  | "processing"
+  | "completed"
+  | "failed";
+```
+
+---
+
+# 29. AITaskInput
+
+```ts
+interface AITaskInput {
+  text?: string;
+  fileIds?: string[];
+  questionId?: string;
+}
+```
+
+---
+
+# 30. AITaskResult
+
+```ts
+interface AITaskResult {
+  type: "answer" | "hint" | "analysis" | "plan";
+  content: string;
+  metadata?: Record<string, unknown>;
+}
+```
+
+当前阶段可以使用：
 
 ```text
-高频明确需求
-    ↓
+Mock Result
+```
+
+未来再接入：
+
+```text
 Workflow
-
-模糊开放需求
-    ↓
+Router
 Agent
+Skill
+Model
 ```
 
 ---
 
-## File Route
+# 31. RoutingInfo
 
-```text
-docx_parser
-pdf_parser
-ocr
-vision_model
-none
-```
+RoutingInfo 用于描述 AI Task 的内部路由结果。
 
----
+Frontend 默认不依赖这些字段。
 
-## Complexity
-
-```text
-low
-medium
-high
-```
-
----
-
-## Model Route
-
-```text
-mock
-rule_based
-lightweight_model
-standard_model
-multimodal_model
-```
-
----
-
-# 23. RouterDecision
-
-RouterDecision 用于记录前置轻量分类器的决策。
-
----
-
-## Schema
-
-```json
-{
-  "intent": "homework",
-  "confidence": 0.92,
-  "input_type": "image",
-  "recommended_handler": "homework_workflow"
+```ts
+interface RoutingInfo {
+  scene?: string;
+  workflow?: string;
+  skill?: string;
+  model?: string;
+  inputType?: string;
 }
 ```
 
-字段：
-
-| 字段                  | 类型     | 描述    |
-| ------------------- | ------ | ----- |
-| intent              | string | 分类结果  |
-| confidence          | number | 分类置信度 |
-| input_type          | string | 输入类型  |
-| recommended_handler | string | 推荐处理器 |
-
----
-
-## Router Decision Flow
-
-```text
-用户输入
-    ↓
-轻量前置分类器
-    ↓
-RouterDecision
-    │
-    ├── 高置信度 + 高频场景
-    │       ↓
-    │    Workflow
-    │
-    ├── 中等置信度
-    │       ↓
-    │    Router 二次判断
-    │
-    └── 低置信度 / 开放问题
-            ↓
-          Agent
-```
-
----
-
-# 24. TokenOptimization
-
-用于记录 Token Pruning 和成本优化效果。
-
-主要用于：
-
-```text
-黑客松 Demo
-实时成本看板
-系统性能分析
-```
-
----
-
-## Schema
+示例：
 
 ```json
 {
-  "original_input_tokens": 1200,
-  "pruned_input_tokens": 450,
-  "token_saved": 750,
-  "token_saved_percent": 62.5
+  "scene": "course_homework",
+  "workflow": "homework",
+  "skill": "math",
+  "model": "mock-model",
+  "inputType": "text"
 }
 ```
 
-字段：
+RoutingInfo 的主要用途：
 
-| 字段                    | 类型      | 描述        |
-| --------------------- | ------- | --------- |
-| original_input_tokens | integer | 原始 Token  |
-| pruned_input_tokens   | integer | 剪枝后 Token |
-| token_saved           | integer | 节省 Token  |
-| token_saved_percent   | number  | 节省比例      |
-
----
-
-# 25. ModelMetrics
-
-用于记录一次模型调用的性能数据。
-
----
-
-## Schema
-
-```json
-{
-  "model_name": "lightweight_model",
-  "input_tokens": 450,
-  "output_tokens": 300,
-  "latency_ms": 1200,
-  "estimated_cost": 0.008
-}
+```text
+调试
+Explainable AI
+Demo
+成本分析
+延迟分析
 ```
 
-字段：
+---
 
-| 字段             | 类型      | 描述       |
-| -------------- | ------- | -------- |
-| model_name     | string  | 模型名称     |
-| input_tokens   | integer | 输入 Token |
-| output_tokens  | integer | 输出 Token |
-| latency_ms     | integer | 延迟       |
-| estimated_cost | number  | 预估成本     |
+# 32. File 与 Material 的关系
+
+文件不是独立的业务学习对象。
+
+当前产品中：
+
+```text
+用户上传文件
+       ↓
+Course Material
+       ↓
+课程知识库
+```
+
+因此：
+
+```text
+File
+ ↓
+Material
+ ↓
+Course
+```
+
+文件本身可以包含：
+
+```text
+原始文件
+解析状态
+文件类型
+文件大小
+```
+
+而 CourseMaterial 负责表达：
+
+> 这个文件属于哪门课程，以及当前资料状态。
 
 ---
 
-# 26. RequestMetrics
+# 33. Home Data
 
-RequestMetrics 用于完整记录一次请求的优化效果。
+Home 页面需要的不是单独的数据库实体，而是多个数据的聚合结果。
 
----
-
-## Schema
-
-```json
-{
-  "request_id": "req_001",
-  "routing": {
-    "intent": "final_sprint",
-    "handler": "final_sprint_workflow",
-    "model_route": "lightweight_model"
-  },
-  "token_optimization": {
-    "original_input_tokens": 1200,
-    "pruned_input_tokens": 450,
-    "token_saved_percent": 62.5
-  },
-  "model_metrics": {
-    "latency_ms": 1200,
-    "estimated_cost": 0.008
-  }
+```ts
+interface HomeData {
+  todayStudy: TodayStudy;
+  recentCourses: Course[];
+  recentHomework: Homework[];
+  learningProgress: LearningProgress;
+  aiSuggestion?: LearningSuggestion;
 }
 ```
 
 ---
 
-# 27. DemoMetrics
+# 34. TodayStudy
 
-DemoMetrics 用于前端实时成本与延迟对比看板。
-
----
-
-## Schema
-
-```json
-{
-  "baseline": {
-    "input_tokens": 2450,
-    "output_tokens": 800,
-    "latency_ms": 3200,
-    "estimated_cost": 0.032
-  },
-  "lingxi_claw": {
-    "input_tokens": 650,
-    "output_tokens": 500,
-    "latency_ms": 1200,
-    "estimated_cost": 0.008
-  },
-  "improvement": {
-    "token_saved_percent": 73.5,
-    "latency_saved_percent": 62.5,
-    "cost_saved_percent": 75.0
-  }
+```ts
+interface TodayStudy {
+  completed: number;
+  total: number;
 }
 ```
 
 ---
 
-# 28. 数据对象关系
+# 35. LearningProgress
 
-系统核心对象关系：
+```ts
+interface LearningProgress {
+  overall: number;
+}
+```
+
+---
+
+# 36. Settings Data
+
+Settings 页面数据由三个部分组成：
 
 ```text
-Dataset
-    │
-    ├── StudyFile
-    │       │
-    │       └── Question
-    │
-    ├── ExamAnalysis
-    │       │
-    │       └── KnowledgePoint
-    │
-    └── StudyPlan
-            │
-            └── PracticeSession
+Settings
+ ├── LearningProfile
+ ├── AIPreference
+ └── GeneralSettings
+```
+
+不创建一个重复的 Settings 数据模型。
+
+---
+
+# 37. Entity Relationship
+
+核心关系：
+
+```text
+User
+ │
+ ├─────────────── LearningProfile
+ │
+ ├─────────────── AIPreference
+ │
+ ├─────────────── GeneralSettings
+ │
+ └─────────────── Course
                     │
-                    └── PracticeAnswer
+                    ├──────── CourseMaterial
+                    │
+                    ├──────── Homework
+                    │              │
+                    │              └── HomeworkQuestion
+                    │
+                    ├──────── Mistake
+                    │
+                    ├──────── LearningRecord
+                    │
+                    └──────── CourseAnalytics
 ```
 
-作业模块：
+其中：
 
 ```text
-Homework
-    │
-    ├── StudyFile
-    │
-    └── HomeworkQuestion
-            │
-            ├── HintRequest
-            │
-            └── HomeworkFeedback
-```
+User 1 ── N Course
 
-路由模块：
+Course 1 ── N CourseMaterial
 
-```text
-User Request
-    │
-    ├── RouterDecision
-    │
-    ├── RoutingInfo
-    │
-    ├── TokenOptimization
-    │
-    └── ModelMetrics
+Course 1 ── N Homework
+
+Homework 1 ── N HomeworkQuestion
+
+Course 1 ── N Mistake
+
+Course 1 ── N LearningRecord
+
+Course 1 ── 1 CourseAnalytics
+
+User 1 ── 1 LearningProfile
+
+User 1 ── 1 AIPreference
+
+User 1 ── 1 GeneralSettings
 ```
 
 ---
 
-# 29. 前后端字段统一规则
+# 38. Product Information Architecture 与 Data Schema
 
-禁止出现：
+产品结构：
 
 ```text
-前端：
+LINGXI
+│
+├── 首次进入 / 学习画像
+│       └── LearningProfile
+│
+├── Home
+│       ├── TodayStudy
+│       ├── RecentCourses
+│       ├── RecentHomework
+│       ├── LearningProgress
+│       └── LearningSuggestion
+│
+├── Courses
+│       └── Course
+│
+├── Course Space
+│       ├── Overview
+│       │     └── CourseOverview
+│       │
+│       ├── 课程资料知识库
+│       │     └── CourseMaterial
+│       │
+│       ├── AI 作业辅导
+│       │     └── Homework
+│       │
+│       ├── 错题记录
+│       │     └── Mistake
+│       │
+│       └── 学习分析
+│             └── CourseAnalytics
+│
+├── Analytics
+│       └── GlobalAnalytics
+│
+└── Settings
+        ├── LearningProfile
+        ├── AIPreference
+        └── GeneralSettings
+```
 
-datasetId
-fileName
+---
+
+# 39. API 与 Data Schema 对应关系
+
+```text
+GET /api/profile
+        ↓
+LearningProfile
+
+GET /api/home
+        ↓
+HomeData
+
+GET /api/courses
+        ↓
+Course[]
+
+GET /api/courses/:courseId
+        ↓
+Course
+
+GET /api/courses/:courseId/overview
+        ↓
+CourseOverview
+
+GET /api/courses/:courseId/materials
+        ↓
+CourseMaterial[]
+
+GET /api/courses/:courseId/homework
+        ↓
+Homework[]
+
+GET /api/courses/:courseId/mistakes
+        ↓
+Mistake[]
+
+GET /api/courses/:courseId/analytics
+        ↓
+CourseAnalytics
+
+GET /api/analytics
+        ↓
+GlobalAnalytics
+
+GET /api/settings/ai
+        ↓
+AIPreference
+
+GET /api/settings/general
+        ↓
+GeneralSettings
+
+POST /api/ai/tasks
+        ↓
+AITask
+```
+
+---
+
+# 40. Frontend TypeScript 使用原则
+
+Frontend 应尽量直接使用本文档对应的 TypeScript 类型。
+
+例如：
+
+```ts
+interface Course {
+  id: string;
+  userId: string;
+  name: string;
+  code?: string;
+  description?: string;
+  progress: number;
+  mastery: number;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+页面：
+
+```tsx
+const [courses, setCourses] = useState<Course[]>([]);
+```
+
+而不是自行定义：
+
+```ts
+interface MyCourse {
+  courseName: string;
+  percent: number;
+}
+```
+
+避免：
+
+```text
+Data Schema
+      ↓
+API
+      ↓
+Frontend 自己重新定义一套数据
+```
+
+---
+
+# 41. Mock Data 使用原则
+
+Mock Data 必须严格遵循 Data Schema。
+
+正确：
+
+```text
+DATA_SCHEMA
+      ↓
+TypeScript Type
+      ↓
+Mock Data
+      ↓
+Mock API
+      ↓
+Frontend
+```
+
+错误：
+
+```text
+Frontend 临时需要一个字段
+      ↓
+Mock 随便加字段
+      ↓
+API 与 Schema 不一致
+```
+
+如果确实需要新的数据字段：
+
+```text
+需求
+ ↓
+修改 DATA_SCHEMA.md
+ ↓
+团队确认
+ ↓
+修改 API.md
+ ↓
+修改 TypeScript Type
+ ↓
+修改 Mock
+ ↓
+修改 Backend
+ ↓
+修改 Test
+```
+
+---
+
+# 42. 数据字段命名规范
+
+统一使用：
+
+```text
+camelCase
+```
+
+例如：
+
+```text
+courseId
 createdAt
+updatedAt
+questionCount
+completedCount
+mistakeCount
+learningGoals
 ```
 
-后端：
+不要混用：
 
 ```text
-dataset_id
-file_name
-created_at
+course_id
+courseID
+CourseId
 ```
 
-正确做法：
+---
+
+# 43. 时间字段规范
+
+所有时间字段统一使用：
 
 ```text
-API JSON
+ISO 8601
+```
+
+例如：
+
+```text
+2026-08-30T10:00:00Z
+```
+
+Frontend 不应该假设 Backend 返回的是某种本地时间格式。
+
+---
+
+# 44. 数值范围规范
+
+百分比字段统一使用：
+
+```text
+0 - 100
+```
+
+例如：
+
+```json
+{
+  "progress": 68,
+  "mastery": 72
+}
+```
+
+不要使用：
+
+```text
+0.68
+0.72
+```
+
+除非 API.md 明确规定。
+
+---
+
+# 45. 当前阶段的数据简化原则
+
+由于 V02 当前主要完成：
+
+```text
+页面框架
+路由
+UI
+Mock
+```
+
+因此数据模型允许简化。
+
+例如：
+
+```text
+Course
+ ├── progress
+ └── mastery
+```
+
+可以直接使用 Mock 数值。
+
+未来真实系统中：
+
+```text
+学习记录
     ↓
-全部 snake_case
+作业表现
+    ↓
+错题
+    ↓
+知识点
+    ↓
+学习分析
+    ↓
+mastery
 ```
 
-统一：
+再逐步计算真实数据。
+
+---
+
+# 46. Workflow / Router / Agent 数据关系
+
+未来 AI 系统：
 
 ```text
-dataset_id
-file_id
-task_id
-question_id
-created_at
-updated_at
+User
+ ↓
+AITask
+ ↓
+Router
+ ↓
+Workflow / Agent
+ ↓
+Skill
+ ↓
+Model
+ ↓
+AITaskResult
 ```
 
----
-
-# 30. Go Struct 示例
-
-Go 后端推荐：
-
-```go
-type Dataset struct {
-    DatasetID string `json:"dataset_id"`
-    Name      string `json:"name"`
-    Course    string `json:"course"`
-    FileCount int    `json:"file_count"`
-    Status    string `json:"status"`
-    CreatedAt string `json:"created_at"`
-    UpdatedAt string `json:"updated_at"`
-}
-```
-
-RoutingInfo：
-
-```go
-type RoutingInfo struct {
-    InputType   string  `json:"input_type"`
-    Intent      string  `json:"intent"`
-    HandlerType string  `json:"handler_type"`
-    Handler     string  `json:"handler"`
-    FileRoute   *string `json:"file_route"`
-    Complexity  string  `json:"complexity"`
-    ModelRoute  string  `json:"model_route"`
-    Fallback    bool    `json:"fallback"`
-}
-```
-
----
-
-# 31. Mock Data 规则
-
-Mock 数据必须遵守 DATA_SCHEMA.md。
-
-例如 Mock Dataset：
-
-```json
-{
-  "dataset_id": "ds_mock_001",
-  "name": "概率论期末突击",
-  "course": "概率论",
-  "file_count": 3,
-  "status": "ready",
-  "created_at": "2026-08-22T10:00:00Z",
-  "updated_at": "2026-08-22T10:00:00Z"
-}
-```
-
-禁止：
-
-```json
-{
-  "id": 1,
-  "title": "概率论",
-  "files": 3
-}
-```
-
-因为 Mock 数据必须与真实后端返回格式兼容。
-
----
-
-# 32. Schema 修改规则
-
-如果新增字段：
+其中：
 
 ```text
+AITask
+```
+
+是 AI 请求的数据载体。
+
+```text
+RoutingInfo
+```
+
+是内部路由结果。
+
+```text
+AITaskResult
+```
+
+是最终 AI 输出。
+
+因此 Frontend 不应该直接依赖：
+
+```text
+Workflow 内部对象
+Router 内部对象
+Agent 内部对象
+Model 内部对象
+```
+
+Frontend 只依赖：
+
+```text
+AITask
+AITaskResult
+RoutingInfo（可选）
+```
+
+---
+
+# 47. 当前禁止事项
+
+当前阶段禁止因为页面开发而随意修改核心数据结构：
+
+```text
+❌ Frontend 自己创造重复 Entity
+❌ Mock 自己创造字段
+❌ Backend 随意修改字段名称
+❌ API 返回与 Data Schema 不一致
+❌ 删除已有 services
+❌ 删除已有 API Types
+❌ 删除 Mock API
+❌ 删除 LegacyApp
+```
+
+如果确实需要修改：
+
+```text
+发现需求
+    ↓
 修改 DATA_SCHEMA.md
     ↓
-修改 API.md
+团队确认
     ↓
-后端修改 Go Struct
+同步 API.md
     ↓
-前端修改 TypeScript Type
+同步 TypeScript Types
     ↓
-更新 Mock Data
+同步 Mock
     ↓
-更新 Test
+同步 Backend
+    ↓
+同步 Test
 ```
-
-禁止：
-
-```text
-直接修改后端 Struct
-```
-
-而不更新文档。
 
 ---
 
-# 33. MVP 必须实现的数据对象
+# 48. 当前优先级
+
+考虑当前开发时间有限，数据结构优先保证：
 
 ## P0
 
 ```text
-Dataset
-StudyFile
-Task
-Question
-ExamAnalysis
-StudyProfile
-StudyPlan
+User
+LearningProfile
+Course
+CourseOverview
+CourseMaterial
 Homework
-HomeworkQuestion
-HomeworkFeedback
-ChatMessage
-RoutingInfo
-RouterDecision
+Mistake
+GlobalAnalytics
+CourseAnalytics
+AIPreference
+GeneralSettings
+HomeData
 ```
-
----
 
 ## P1
 
 ```text
-KnowledgePoint
-PracticeSession
-PracticeAnswer
-AgentSettings
-TokenOptimization
-ModelMetrics
+HomeworkQuestion
+LearningRecord
+LearningSuggestion
+LearningActivity
 ```
 
----
-
-## P2 / Demo
+## P2
 
 ```text
-RequestMetrics
-DemoMetrics
-```
-
----
-
-# 34. 最终数据流
-
-```text
-用户输入
-    ↓
-User Request
-    ↓
-RouterDecision
-    ↓
+AITask
+AITaskResult
 RoutingInfo
-    ↓
-┌─────────────────────┐
-│                     │
-Workflow            Agent
-│                     │
-↓                     ↓
-Dataset             ChatMessage
-StudyFile
-Question
-Homework
-│
-↓
-ExamAnalysis
-│
-↓
-StudyPlan
-│
-↓
-PracticeSession
-│
-↓
-PracticeAnswer
-│
-↓
-Response
+```
+
+P2 数据结构主要为后续真实 AI 联调准备。
+
+---
+
+# 49. 最终数据架构
+
+Lingxi-claw 当前的数据核心可以概括为：
+
+```text
+                         User
+                           │
+            ┌──────────────┼──────────────┐
+            ↓              ↓              ↓
+       学习画像          AI 偏好        通用设置
+            │
+            ↓
+         Courses
+            │
+            ↓
+       ┌────────────┐
+       │ Course     │
+       └─────┬──────┘
+             │
+      ┌──────┼──────┬──────────┐
+      ↓      ↓      ↓          ↓
+  Materials Homework Mistakes Analytics
+             │
+             ↓
+       HomeworkQuestion
+
+             ↓
+       LearningRecord
+             ↓
+      Global Analytics
+             ↓
+      Learning Suggestion
+```
+
+AI 能力作为独立的数据流：
+
+```text
+User
+ ↓
+AITask
+ ↓
+Router
+ ↓
+Workflow / Agent
+ ↓
+Skill / Model
+ ↓
+AITaskResult
 ```
 
 ---
 
-# 35. 核心原则
+# 50. 一句话总结
 
-Lingxi-claw 的数据设计遵循：
-
-> **外部接口统一、内部模块解耦、Mock 与真实数据兼容。**
-
-最终：
-
-```text
-DATA_SCHEMA.md
-        ↓
-定义数据是什么
-
-API.md
-        ↓
-定义数据怎么传输
-
-ARCHITECTURE.md
-        ↓
-定义数据经过哪些模块
-
-WORKFLOW.md
-        ↓
-定义数据如何流动
-```
-
-这四个文档共同构成 Lingxi-claw 的核心技术规范。
-
-````
-
-我特别建议你们**暂时不要让队友一次性把这里所有对象都实现成数据库表**。这是 `Data Schema`，不等于数据库 Schema。
-
-例如黑客松 MVP 可以先这样：
-
-```text
-Dataset / Task / Question
-        ↓
-Go 内存 / JSON 文件 / SQLite
-
-复杂 AI 分析结果
-        ↓
-直接 JSON
-
-Router Metrics
-        ↓
-内存记录 / 日志
+> **DATA_SCHEMA.md 定义 Lingxi-claw “数据长什么样”，以 User → Course → Course Space 为核心数据关系，并围绕课程资料、作业、错题、学习记录和学习分析建立统一的数据模型；AI 部分通过 AITask 与 AITaskResult 进行隔离，为后续 Workflow、Router、Agent 和 Model 联调提供稳定的数据基础。**

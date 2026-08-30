@@ -2,1439 +2,1439 @@
 
 ## 1. 文档目的
 
-本文档定义 Lingxi-claw 的整体技术架构，以及前端、后端、Workflow、Router、Agent、文件处理和模型之间的关系。
+本文档定义 Lingxi-claw 的整体技术架构，以及前端、后端、Workflow、Agent、文件处理和模型之间的关系。
 
 核心目标：
 
 1. 明确前后端之间的职责边界
 2. 明确 Workflow 与 Agent 的调用关系
-3. 明确 Router 在系统中的位置
-4. 明确文件、题目、学习状态和模型如何参与路由
-5. 为团队协作和 Vibe Coding 提供统一的技术上下文
+3. 明确文件、题目、学习状态和模型如何参与路由
+4. 为团队协作和 Vibe Coding 提供统一的技术上下文
+5. 明确当前 V02 阶段的实现范围，避免过早实现真实 AI 能力
 
 ---
 
-## 2. 核心架构理念
+# 2. 系统总体架构
 
-Lingxi-claw 不是简单的：
+Lingxi-claw 是一个面向大学生的个人 AI 学习系统。
 
-```text
-用户
- ↓
-大模型
- ↓
-回答
-````
-
-而是：
+系统整体分为五个主要层次：
 
 ```text
-用户
- ↓
-前端 Sidebar
- ↓
-选择学习模式
- ↓
-Workflow / Agent
- ↓
-内部 Router
- ↓
-根据任务进行精准分流
- ↓
-文件 / 题型 / 学习状态 / 模型
- ↓
-执行对应能力
- ↓
-生成学习结果
- ↓
-返回前端
-```
-
-核心设计原则：
-
-> **用户选择大场景，Workflow 负责流程，Router 负责分流，Agent 负责复杂任务。**
-
----
-
-## 3. 系统整体架构
-
-```text
-┌─────────────────────────────────────────────────────────────┐
-│                         Frontend                            │
-│                                                             │
-│  Study with Lingxi-claw                                    │
-│                                                             │
-│  Sidebar                                                    │
-│  ├── 📚 期末突击                                            │
-│  ├── 📝 日常作业辅助                                        │
-│  ├── ❓ 其它问题                                            │
-│  └── 🤖 Agent 设定                                          │
-│                                                             │
-│                     ↓ HTTP / API ↓                         │
-└──────────────────────────────┬──────────────────────────────┘
-                               │
-                               ↓
-┌─────────────────────────────────────────────────────────────┐
-│                         Backend                             │
-│                                                             │
-│                         API Layer                           │
-│                              ↓                              │
-│                         Main Router                         │
-│                              ↓                              │
-│                    Workflow / Agent Layer                   │
-│                              ↓                              │
-│                    Internal Router Layer                    │
-│                              ↓                              │
-│       ┌────────────┬────────────┬────────────┬──────────┐  │
-│       ↓            ↓            ↓            ↓          │  │
-│   File Router  Question      State Router  Model      │  │
-│                Router                       Router      │  │
-│       ↓            ↓            ↓            ↓          │  │
-│   File Parser   Question     Learning      LLM /      │  │
-│   OCR / DOCX    Classifier    State        Model       │  │
-│                / Skill                    Provider      │  │
-│       └────────────┴────────────┴────────────┴──────────┘  │
-│                              ↓                              │
-│                       Services Layer                        │
-│                              ↓                              │
-│                    Data / Knowledge Base                    │
-└─────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│                    Frontend                          │
+│                                                      │
+│  Onboarding / Home / Courses / Course Space          │
+│  Analytics / Settings                                │
+│                                                      │
+└────────────────────────┬─────────────────────────────┘
+                         │
+                    REST / API
+                         │
+                         ↓
+┌──────────────────────────────────────────────────────┐
+│                    Backend                           │
+│                                                      │
+│  API / Business Logic / User / Course / Task         │
+│                                                      │
+└────────────────────────┬─────────────────────────────┘
+                         │
+                         ↓
+┌──────────────────────────────────────────────────────┐
+│                AI Orchestration Layer                │
+│                                                      │
+│  Task Router                                         │
+│      ↓                                               │
+│  Workflow / General Agent                            │
+│      ↓                                               │
+│  Skill / Tool / Model                                │
+│                                                      │
+└────────────────────────┬─────────────────────────────┘
+                         │
+                         ↓
+┌──────────────────────────────────────────────────────┐
+│                  Data / AI Services                  │
+│                                                      │
+│  Course Data / Files / Questions / Wrong Answers     │
+│  Learning Records / Knowledge Base / Models          │
+│                                                      │
+└──────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 4. 用户请求的完整生命周期
+# 3. 产品架构与技术架构的关系
 
-一个请求从用户输入到最终返回，大致经历以下过程：
+Lingxi-claw 的产品结构以**课程**为核心。
+
+用户侧：
 
 ```text
-用户
- ↓
+首次进入
+    ↓
+学习画像
+    ↓
+Home
+    ↓
+我的课程
+    ↓
+Course Space
+    ↓
+具体学习任务
+```
+
+技术侧：
+
+```text
+用户操作
+    ↓
 Frontend
- ↓
-API Request
- ↓
-Main Router
- ↓
-识别当前学习模式
- ↓
-Workflow / Agent
- ↓
-内部 Router
- ↓
-选择具体处理能力
- ↓
-执行 Service / Tool / Model
- ↓
-生成结果
- ↓
-Schema 校验
- ↓
-API Response
- ↓
-Frontend
- ↓
-展示结果
+    ↓
+API
+    ↓
+Backend
+    ↓
+Task / Workflow
+    ↓
+AI / Data Services
 ```
+
+因此：
+
+> **产品层围绕课程组织，技术层围绕任务和数据处理组织。**
 
 ---
 
-## 5. 第一层：Frontend
+# 4. Frontend 架构
+
+## 4.1 Frontend 职责
 
 Frontend 负责：
 
 * 页面展示
-* Sidebar 模式切换
-* 文件上传
-* 用户输入
-* 对话展示
-* 学习计划展示
-* 题目展示
-* 作答交互
-* Agent 设置
-* Loading / Error 状态
+* 路由
+* 用户交互
+* 状态展示
+* 表单输入
+* 文件上传入口
+* API 调用
+* Loading / Empty / Error 状态
+* Workflow 状态展示
+* AI 结果展示
 
-Frontend **不负责**：
+Frontend 不负责：
 
-* 判断使用哪个模型
-* 判断调用哪个 Agent
-* 解析复杂文件
-* 统计历年考点
-* 生成复习计划
-* 决定 Workflow 的具体执行逻辑
-
-这些逻辑统一放在 Backend。
+* 数据库
+* AI 模型调用
+* Workflow 核心逻辑
+* Agent 核心逻辑
+* OCR
+* 文件解析
+* 向量检索
+* 模型路由
 
 ---
 
-## 6. Sidebar：第一层场景路由
+# 5. Frontend 页面架构
 
-用户通过 Sidebar 主动选择学习场景。
+当前 V02 页面结构：
 
 ```text
-Sidebar
-   │
-   ├── 📚 期末突击
-   │       ↓
-   │   final_sprint
-   │
-   ├── 📝 日常作业辅助
-   │       ↓
-   │   homework
-   │
-   ├── ❓ 其它问题
-   │       ↓
-   │   general
-   │
-   └── 🤖 Agent 设定
-           ↓
-       settings
+Frontend
+│
+├── Onboarding / 学习画像
+│
+├── Home
+│
+├── Courses
+│   │
+│   ├── 高等数学
+│   ├── 大学物理
+│   ├── 线性代数
+│   └── 添加课程
+│
+├── Course Space
+│   │
+│   ├── 概览
+│   ├── 课程资料知识库
+│   ├── AI 作业辅导
+│   ├── 错题记录
+│   └── 学习分析
+│
+├── Analytics
+│
+└── Settings
+    ├── 学习画像
+    ├── AI 偏好
+    └── 通用设置
 ```
 
-Frontend 向 Backend 发送：
+---
 
-```json
-{
-  "mode": "final_sprint"
-}
+# 6. Frontend 路由架构
+
+当前核心路由：
+
+```text
+/home
+/courses
+/courses/:courseId
+/analytics
+/settings
+```
+
+未来可以进一步扩展：
+
+```text
+/onboarding
+
+/courses/:courseId/overview
+/courses/:courseId/materials
+/courses/:courseId/homework
+/courses/:courseId/mistakes
+/courses/:courseId/analytics
+```
+
+但具体 URL 结构以实际前端实现为准。
+
+原则：
+
+> 路由用于表达产品信息架构，不应该直接暴露后端 Workflow 内部实现。
+
+例如不应该设计：
+
+```text
+/final-sprint-agent
+/document-parser
+/task-router
+```
+
+因为这些属于系统内部能力。
+
+---
+
+# 7. AppShell 架构
+
+Frontend 使用统一 AppShell：
+
+```text
+App
+ │
+ └── AppShell
+      │
+      ├── Sidebar
+      │
+      └── Main Content
+            │
+            └── Router Outlet
+                  │
+                  ├── Home
+                  ├── Courses
+                  ├── CourseSpace
+                  ├── Analytics
+                  └── Settings
+```
+
+AppShell 负责：
+
+* 全局页面布局
+* Sidebar
+* 页面主体区域
+* 全局导航
+* 页面容器
+
+具体页面只负责自己的内容。
+
+---
+
+# 8. Course Space 架构
+
+Course Space 是整个产品的核心二级架构。
+
+用户：
+
+```text
+Courses
+    ↓
+选择课程
+    ↓
+Course Space
+```
+
+Course Space：
+
+```text
+Course Space
+│
+├── Overview
+│
+├── Materials
+│
+├── Homework
+│
+├── Mistakes
+│
+└── Analytics
+```
+
+其中：
+
+```text
+Overview
+    ↓
+课程整体状态
+
+Materials
+    ↓
+课程资料 / 知识库
+
+Homework
+    ↓
+AI 作业辅导
+
+Mistakes
+    ↓
+错题记录
+
+Analytics
+    ↓
+课程学习分析
+```
+
+Course Space 的所有数据都必须绑定当前课程。
+
+例如：
+
+```text
+/course/math
+```
+
+其中：
+
+```text
+courseId = math
+```
+
+后续 API 请求必须携带对应课程上下文。
+
+---
+
+# 9. Backend 架构
+
+Backend 是 Frontend 与 AI / 数据服务之间的业务层。
+
+Backend 主要负责：
+
+```text
+API
+ ↓
+身份 / 用户
+ ↓
+课程
+ ↓
+学习任务
+ ↓
+Workflow
+ ↓
+AI 能力
+ ↓
+数据持久化
+```
+
+Backend 不应该把所有逻辑全部塞进 API Controller。
+
+推荐：
+
+```text
+API Layer
+    ↓
+Service Layer
+    ↓
+Workflow / AI Layer
+    ↓
+Data Layer
+```
+
+---
+
+# 10. Backend API Layer
+
+API Layer 负责：
+
+* 接收 Frontend 请求
+* 参数校验
+* 身份校验
+* 调用对应 Service
+* 返回统一格式
+* 错误处理
+
+例如：
+
+```text
+GET /api/courses
+```
+
+用于获取课程列表。
+
+```text
+GET /api/courses/:courseId
+```
+
+用于获取课程信息。
+
+```text
+GET /api/courses/:courseId/materials
+```
+
+用于获取课程资料。
+
+```text
+GET /api/courses/:courseId/homework
+```
+
+用于获取课程作业。
+
+```text
+GET /api/courses/:courseId/mistakes
+```
+
+用于获取错题。
+
+```text
+GET /api/courses/:courseId/analytics
+```
+
+用于获取课程学习分析。
+
+具体接口定义以 `API.md` 为准。
+
+---
+
+# 11. AI Orchestration Layer
+
+AI Orchestration Layer 是系统 AI 能力的核心。
+
+整体结构：
+
+```text
+用户任务
+    ↓
+Task Router
+    ↓
+判断任务类型
+    ↓
+┌───────────────┬────────────────┐
+│               │                │
+Workflow     General Agent       │
+│               │                │
+↓               ↓                │
+结构化执行     动态规划           │
+└───────────────┴────────────────┘
+                ↓
+             Skill / Tool
+                ↓
+              Model
+```
+
+---
+
+# 12. Task Router
+
+Task Router 负责判断：
+
+```text
+当前是什么任务？
+```
+
+可以使用以下上下文：
+
+```text
+用户
+课程
+当前页面
+用户输入
+文件类型
+任务类型
+学习状态
+任务复杂度
+```
+
+例如：
+
+```text
+用户在：
+
+高等数学
+    ↓
+AI 作业辅导
+    ↓
+上传一道数学题
+```
+
+Router 可以判断：
+
+```text
+课程 = 高等数学
+任务 = 作业辅导
+输入 = 图片
+题型 = 数学题
+```
+
+然后选择：
+
+```text
+Homework Workflow
+    ↓
+Vision / OCR
+    ↓
+Math Skill
+    ↓
+对应模型
+```
+
+---
+
+# 13. Workflow 层
+
+Workflow 用于处理明确、结构化的学习任务。
+
+典型 Workflow：
+
+```text
+AI Homework Workflow
+Materials Workflow
+Mistake Review Workflow
+Learning Analysis Workflow
+```
+
+Workflow 负责：
+
+* 定义步骤
+* 控制执行顺序
+* 调用对应 Skill
+* 调用工具
+* 保存任务状态
+* 返回结构化结果
+
+例如 AI 作业辅导：
+
+```text
+Homework Workflow
+    ↓
+识别题目
+    ↓
+识别知识点
+    ↓
+判断用户状态
+    ↓
+选择提示等级
+    ↓
+生成提示
+    ↓
+用户继续作答
+    ↓
+检查
+```
+
+---
+
+# 14. General Agent
+
+General Agent 用于处理无法被固定 Workflow 覆盖的问题。
+
+例如：
+
+```text
+用户：
+为什么二重积分需要换元？
+```
+
+如果不属于明确的固定任务：
+
+```text
+Task Router
+    ↓
+General Agent
+    ↓
+理解问题
+    ↓
+决定是否需要：
+├── 直接回答
+├── 检索资料
+├── 工具调用
+└── 多步骤规划
+```
+
+General Agent 是系统的兜底能力。
+
+原则：
+
+> **Workflow 优先，Agent 兜底。**
+
+---
+
+# 15. Skill 层
+
+Skill 是 Workflow / Agent 可以调用的具体能力。
+
+例如：
+
+```text
+Math Skill
+Physics Skill
+Question Analysis Skill
+Learning Plan Skill
+Grading Skill
+Hint Skill
+```
+
+Skill 与 Workflow 的关系：
+
+```text
+Workflow
+    ↓
+调用 Skill
+    ↓
+完成具体任务
+```
+
+例如：
+
+```text
+Homework Workflow
+    ↓
+Question Recognition
+    ↓
+Math Skill
+    ↓
+Hint Service
+```
+
+Skill 不负责决定整个用户任务应该怎么执行。
+
+---
+
+# 16. 文件处理架构
+
+Lingxi-claw 支持多种学习资料。
+
+文件进入系统后：
+
+```text
+Upload
+    ↓
+File Type Detection
+    ↓
+Parser Router
+    ↓
+┌────────┬────────┬──────────┬──────────┐
+│ DOCX   │ PDF    │ Scan PDF │ Image    │
+└───┬────┴───┬────┴────┬─────┴────┬─────┘
+    ↓        ↓         ↓          ↓
+ Text      PDF      OCR        OCR/Vision
+ Parser    Parser
+    └────────┴─────────┴──────────┘
+                  ↓
+             Structured Data
+                  ↓
+             Course Knowledge
+```
+
+文件处理属于 Backend / AI 服务能力。
+
+Frontend 只负责：
+
+```text
+选择文件
+    ↓
+上传
+    ↓
+显示上传状态
+    ↓
+显示处理状态
+```
+
+---
+
+# 17. 数据架构
+
+核心数据对象：
+
+```text
+User
+Course
+CourseMaterial
+Homework
+Question
+WrongAnswer
+LearningRecord
+LearningProfile
+LearningAnalysis
+AIPreference
+```
+
+基本关系：
+
+```text
+User
+ │
+ ├── LearningProfile
+ │
+ └── Courses
+       │
+       ├── Materials
+       │
+       ├── Homework
+       │      └── Questions
+       │
+       ├── WrongAnswers
+       │
+       └── LearningRecords
+```
+
+课程是重要的数据隔离单位。
+
+例如：
+
+```text
+User
+ ├── 高等数学
+ │    ├── 资料
+ │    ├── 作业
+ │    └── 错题
+ │
+ ├── 大学物理
+ │    ├── 资料
+ │    ├── 作业
+ │    └── 错题
+ │
+ └── 线性代数
+      ├── 资料
+      ├── 作业
+      └── 错题
+```
+
+具体数据字段以 `DATA_SCHEMA.md` 为准。
+
+---
+
+# 18. 学习数据闭环
+
+系统最终形成：
+
+```text
+课程资料
+    ↓
+学习任务
+    ↓
+作业 / 练习
+    ↓
+用户作答
+    ↓
+学习记录
+    ↓
+错题
+    ↓
+学习分析
+    ↓
+发现薄弱知识点
+    ↓
+AI 学习建议
+    ↓
+新的学习任务
+```
+
+数据最终服务于：
+
+```text
+Home
+Course Space
+Analytics
+AI Learning Suggestion
+```
+
+---
+
+# 19. Analytics 架构
+
+Analytics 分为两个层级。
+
+## 19.1 Course Analytics
+
+针对单门课程：
+
+```text
+Course Space
+    ↓
+Learning Analytics
+    ↓
+当前课程数据
+```
+
+分析：
+
+* 当前课程掌握度
+* 知识点
+* 错题
+* 作业
+* 学习趋势
+
+---
+
+## 19.2 Global Analytics
+
+针对用户整体：
+
+```text
+Analytics
+    ↓
+多课程数据
+    ↓
+整体学习状态
+```
+
+分析：
+
+* 整体学习情况
+* 各课程掌握度
+* 知识薄弱点
+* 作业表现
+* 学习趋势
+
+---
+
+# 20. AI Model Layer
+
+模型层不应该直接暴露给 Frontend。
+
+整体：
+
+```text
+Frontend
+    ↓
+Backend
+    ↓
+Router
+    ↓
+Workflow / Agent
+    ↓
+Model Service
+```
+
+模型选择未来可以根据：
+
+```text
+任务复杂度
+输入模态
+任务类型
+响应速度
+成本
+模型能力
+```
+
+进行动态选择。
+
+例如：
+
+```text
+简单文本问题
+    ↓
+轻量模型
+
+普通学习问题
+    ↓
+通用模型
+
+复杂数学 / 多模态问题
+    ↓
+高能力模型
+```
+
+---
+
+# 21. Token / 成本优化架构
+
+Lingxi-claw 可以保留原有 Token 优化设计。
+
+未来可以：
+
+```text
+用户输入
+    ↓
+轻量预处理
+    ↓
+Token Pruning
+    ↓
+保留有效上下文
+    ↓
+Task Router
+    ↓
+选择模型
+```
+
+同时记录：
+
+```text
+输入 Token
+输出 Token
+模型
+响应时间
+估算成本
+```
+
+用于未来的：
+
+```text
+Cost Analytics
+Latency Analytics
+```
+
+当前 V02 阶段：
+
+> 不要求重新实现 Token Pruning 或模型成本优化。
+
+---
+
+# 22. API Contract
+
+Frontend 与 Backend 必须通过 API Contract 协作。
+
+基本原则：
+
+```text
+Frontend
+    ↓
+API Contract
+    ↓
+Backend
+```
+
+双方不能通过：
+
+```text
+直接读取数据库
+直接调用内部 Python 模块
+直接修改对方代码
+```
+
+进行耦合。
+
+API 的请求和响应结构统一记录在：
+
+```text
+docs/API.md
+```
+
+如果 API 发生变化：
+
+```text
+Backend 修改
+    ↓
+更新 API.md
+    ↓
+Frontend 根据 Contract 调整
+    ↓
+QA 回归测试
+```
+
+---
+
+# 23. Mock Mode
+
+当前 V02 阶段必须保留 Mock Mode。
+
+系统可以：
+
+```text
+Frontend
+    ↓
+Mock API
+    ↓
+Mock Data
 ```
 
 或者：
 
-```json
-{
-  "mode": "homework"
-}
+```text
+Frontend
+    ↓
+Real API
+    ↓
+Backend
+```
+
+通过配置切换。
+
+Mock Mode 用于：
+
+* UI 开发
+* 页面联调
+* 路由测试
+* API 占位
+* Demo
+* QA 测试
+
+Mock 数据必须与未来 API 数据结构尽可能一致。
+
+---
+
+# 24. LegacyApp 兼容架构
+
+项目原有 LegacyApp 必须保留。
+
+当前架构允许：
+
+```text
+                    Lingxi
+                       │
+             ┌─────────┴─────────┐
+             │                   │
+          V02 App              LegacyApp
+             │                   │
+        新产品架构          原有完整 Demo
+```
+
+LegacyApp 中已有能力包括：
+
+* 期末突击
+* 日常作业辅助
+* General Question
+* Agent Settings
+* 文件上传
+* 文件分析 Mock
+* 复习计划 Mock
+* Chat Mock
+
+V02 重构不能因为新的产品架构而删除这些能力。
+
+尤其禁止未经确认删除：
+
+```text
+services/
+API Types
+API Calls
+Mock API
+LegacyApp
 ```
 
 ---
 
-## 7. API Layer
+# 25. 当前 V02 技术范围
 
-Backend 的 API Layer 是前后端之间的统一入口。
+当前阶段目标：
 
-建议按照功能划分 API：
+> **建立完整的产品信息架构、前端页面架构和前后端协作边界。**
 
-```text
-backend/app/api/
-```
+---
 
-例如：
+## 25.1 当前已实现 / 应实现
 
 ```text
-POST /api/final-sprint/upload
-POST /api/final-sprint/analyze
-POST /api/final-sprint/plan
-POST /api/final-sprint/practice
-
-POST /api/homework/upload
-POST /api/homework/analyze
-POST /api/homework/check
-
-POST /api/chat
-
-GET  /api/settings
-POST /api/settings
+Frontend
+├── React
+├── React Router
+├── AppShell
+├── Sidebar
+├── PageHeader
+├── Card
+├── Home
+├── Courses
+├── Course Space
+├── Analytics
+└── Settings
 ```
 
-API Layer 的主要职责：
+并且：
 
 ```text
-接收请求
- ↓
-参数校验
- ↓
-调用对应 Workflow / Agent
- ↓
-返回标准 Response
+npm run build
 ```
 
-API Layer 不应该直接编写复杂业务逻辑。
+必须保持通过。
 
-错误示例：
+---
+
+## 25.2 当前只需要页面框架
+
+```text
+学习画像
+Home
+Courses
+Course Space
+    ├── 概览
+    ├── 课程资料知识库
+    ├── AI 作业辅导
+    ├── 错题记录
+    └── 学习分析
+Analytics
+Settings
+```
+
+这些页面当前可以使用 Mock Data。
+
+---
+
+# 26. 当前暂不实现
+
+V02 阶段暂不要求：
+
+```text
+❌ 真实 AI 模型调用
+❌ 真实 Workflow
+❌ 真实 General Agent
+❌ 真实 Task Router
+❌ 真实 OCR
+❌ 真实 Vision
+❌ 真实文件解析
+❌ 真实向量数据库
+❌ 真实知识库
+❌ 真实学习分析算法
+❌ 真实个性化推荐
+❌ 真实 Token Pruning
+❌ 真实模型成本优化
+```
+
+这些属于后续阶段。
+
+---
+
+# 27. 三人团队职责边界
+
+项目由三类角色协作：
+
+```text
+Frontend
+Backend
+QA / Testing
+```
+
+---
+
+## 27.1 Frontend
+
+负责：
+
+```text
+pages/
+components/
+routes/
+styles/
+UI state
+API integration
+```
+
+核心目标：
+
+> 将产品信息架构实现成可交互页面。
+
+Frontend 不应：
+
+* 修改 Backend 核心逻辑
+* 修改数据库结构
+* 修改 AI Workflow
+* 删除 services
+* 删除已有 API 类型
+
+---
+
+## 27.2 Backend
+
+负责：
 
 ```text
 API
- ↓
-直接解析 PDF
- ↓
-直接调用 LLM
- ↓
-直接生成复习计划
-```
-
-正确方式：
-
-```text
-API
- ↓
+Business Logic
+Data
 Workflow
- ↓
-Router
- ↓
-Service
- ↓
-Model
-```
-
----
-
-## 8. Main Router：主场景路由
-
-用户通过 Sidebar 选择模式之后，Backend 首先进行主场景路由。
-
-```text
-用户请求
- ↓
-Main Router
- ↓
-┌────────────────────────────────┐
-│                                │
-│ final_sprint → Final Sprint    │
-│ homework     → Homework        │
-│ general      → General Agent   │
-│ settings     → Settings        │
-│                                │
-└────────────────────────────────┘
-```
-
-Main Router 只负责：
-
-> **决定用户应该进入哪个主 Workflow / Agent。**
-
-它不负责处理具体题目。
-
----
-
-## 9. Workflow Layer
-
-Workflow 是系统中最重要的业务流程层。
-
-目录：
-
-```text
-backend/app/workflows/
-```
-
-建议：
-
-```text
-workflows/
-├── final_sprint.py
-├── homework.py
-└── ...
-```
-
-Workflow 负责组织多个步骤。
-
-例如：
-
-```text
-Final Sprint Workflow
-
-文件上传
- ↓
-文件解析
- ↓
-题目提取
- ↓
-题型分类
- ↓
-考点分析
- ↓
-复习计划
- ↓
-刷题
- ↓
-学习反馈
-```
-
-Workflow 本身不应该实现所有底层功能。
-
-例如：
-
-```text
-Workflow
- ↓
-调用 File Service
- ↓
-调用 Question Service
- ↓
-调用 Exam Analysis Service
- ↓
-调用 Study Planner
-```
-
----
-
-## 10. Agent Layer
-
-目录：
-
-```text
-backend/app/agents/
-```
-
-Agent 用于处理：
-
-* 开放式问题
-* 非固定流程
-* 多步骤复杂任务
-* 需要自主决定工具的任务
-* Workflow 无法覆盖的请求
-
-核心原则：
-
-> **Workflow 解决确定性问题，Agent 解决开放性问题。**
-
----
-
-## 11. Workflow + Agent 关系
-
-系统不是 Workflow 和 Agent 二选一。
-
-而是：
-
-```text
-                 用户
-                   ↓
-              主场景选择
-                   ↓
-        ┌──────────┴──────────┐
-        ↓                     ↓
-    Workflow              Agent
-        ↓                     ↓
-确定流程任务             开放复杂任务
-        ↓                     ↓
-内部 Router              Agent Router
-        ↓                     ↓
-Services / Tools         Tools / Models
-```
-
-例如：
-
-#### 期末突击
-
-```text
-Final Sprint Workflow
-        ↓
-File Router
-        ↓
-Question Router
-        ↓
-Exam Analysis
-        ↓
-Study Planner
-```
-
-#### 日常作业
-
-```text
-Homework Workflow
-        ↓
-File Router
-        ↓
-Question Router
-        ↓
-Homework State Router
-        ↓
-Answer Checker
-```
-
-#### 其它问题
-
-```text
-General Agent
-        ↓
-Request Router
-        ↓
-Complexity Router
-        ↓
-Tool / Model Router
-        ↓
 Agent
+AI Services
+File Processing
 ```
+
+核心目标：
+
+> 为 Frontend 提供稳定的 API 和未来 AI 能力。
+
+Backend 不应：
+
+* 直接修改 Frontend UI
+* 改变前端页面结构而不更新 API Contract
+* 删除现有 Mock API
+* 未沟通修改 Frontend 文件
 
 ---
 
-## 12. Internal Router Layer
+## 27.3 QA / Testing
 
-Router 是 Lingxi-claw 的核心技术之一。
-
-Router 的目标不是简单地：
-
-> “选择一个大模型。”
-
-而是根据不同维度，把请求分配给最合适的处理模块。
-
-主要包括：
+负责：
 
 ```text
-Router
-│
-├── Main Router
-│
-├── File Router
-│
-├── Question Router
-│
-├── State Router
-│
-├── Model Router
-│
-└── Tool Router
+Functional Testing
+API Testing
+Integration Testing
+Regression Testing
+UI Testing
 ```
 
----
+核心目标：
 
-## 13. File Router
+> 确保 Frontend + Backend + API + Workflow 在用户视角下能够正常工作。
 
-File Router 判断输入文件应该使用什么解析方式。
+QA 重点验证：
 
 ```text
-文件
+页面
  ↓
-File Router
+路由
  ↓
-┌────────────┬────────────┬────────────┬────────────┐
-↓            ↓            ↓            ↓
-DOCX         PDF          Scan PDF     Image
-↓            ↓            ↓            ↓
-DOCX Parser  PDF Parser   OCR          OCR/Vision
-```
-
-例如：
-
-```json
-{
-  "file_type": "pdf",
-  "is_scanned": true
-}
-```
-
-Router：
-
-```text
-PDF + scanned
+API
  ↓
-OCR
-```
-
-而：
-
-```json
-{
-  "file_type": "pdf",
-  "is_scanned": false
-}
-```
-
-则：
-
-```text
-PDF
- ↓
-Text Parser
-```
-
----
-
-## 14. Question Router
-
-Question Router 判断题目的：
-
-* 学科
-* 题型
-* 知识点
-* 难度
-* 是否需要多模态能力
-* 是否需要复杂模型
-
-例如：
-
-```text
-题目
- ↓
-Question Router
- ↓
-数学
- ↓
-二重积分
- ↓
-计算题
- ↓
-Medium
-```
-
-然后将结果交给对应的 Skill / Service。
-
----
-
-## 15. State Router
-
-State Router 判断用户当前处于什么学习状态。
-
-主要应用于日常作业辅助。
-
-```text
-用户状态
- ↓
-State Router
- ↓
-┌────────────────┬────────────────┬────────────────┐
-↓                ↓                ↓
-刚开始做题       正在尝试         已提交答案
-↓                ↓                ↓
-方向提示         方法提示         答案检查
-```
-
-如果用户多次尝试仍然无法解决：
-
-```text
-多次失败
- ↓
-State Router
- ↓
-升级帮助等级
- ↓
-完整解题过程
-```
-
----
-
-## 16. Model Router
-
-Model Router 决定：
-
-> 当前任务需要什么级别的模型？
-
-核心原则：
-
-> **简单任务使用低成本处理，复杂任务才调用更强模型。**
-
-```text
-请求
- ↓
-Complexity Analysis
- ↓
-┌──────────────┬──────────────┬──────────────┐
-↓              ↓              ↓
-简单            普通            复杂
-↓              ↓              ↓
-轻量模型        标准模型        大模型 / Agent
-```
-
-例如：
-
-```text
-“什么是概率？”
- ↓
-轻量模型
-```
-
-```text
-“解释贝叶斯公式并举例”
- ↓
-标准模型
-```
-
-```text
-“分析我上传的五年期末试卷并制定复习计划”
+数据
  ↓
 Workflow
  ↓
-多个 Service
- ↓
-必要时调用强模型
+结果
 ```
 
 ---
 
-## 17. Tool Router
+# 28. 文件修改边界
 
-某些请求不需要直接调用模型，而是需要工具。
-
-例如：
-
-```text
-用户请求
- ↓
-Tool Router
- ↓
-┌───────────────┬───────────────┬───────────────┐
-↓               ↓               ↓
-文件解析         知识库检索       计算工具
-```
-
-未来可以继续扩展：
-
-```text
-Tool Router
-├── File Parser
-├── OCR
-├── Knowledge Retrieval
-├── Calculator
-├── Code Execution
-└── Search
-```
-
----
-
-## 18. Services Layer
-
-目录：
-
-```text
-backend/app/services/
-```
-
-Services 是具体能力的实现层。
-
-建议按照职责拆分：
-
-```text
-services/
-├── file_service.py
-├── ocr_service.py
-├── question_service.py
-├── knowledge_service.py
-├── exam_analysis_service.py
-├── study_plan_service.py
-├── question_selector.py
-├── answer_checker.py
-└── llm_service.py
-```
-
----
-
-## 19. Services 与 Workflow 的关系
-
-Workflow 负责：
-
-> **决定先做什么、后做什么。**
-
-Service 负责：
-
-> **具体把某件事情做好。**
-
-例如：
-
-```text
-Final Sprint Workflow
-        ↓
-File Service
-        ↓
-Question Service
-        ↓
-Exam Analysis Service
-        ↓
-Study Plan Service
-        ↓
-Question Selector
-```
-
-不要把所有代码全部写进 Workflow。
-
----
-
-## 20. Schemas Layer
-
-目录：
-
-```text
-backend/app/schemas/
-```
-
-Schemas 用于定义系统内部统一的数据结构。
-
-核心对象包括：
-
-```text
-Dataset
-File
-Question
-KnowledgePoint
-ExamAnalysis
-StudyPlan
-PracticeRecord
-UserLearningState
-AgentProfile
-```
-
----
-
-## 21. Dataset 数据关系
-
-期末突击的核心数据结构：
-
-```text
-Dataset
- │
- ├── Files
- │
- ├── Questions
- │
- ├── Knowledge Points
- │
- ├── Exam Analysis
- │
- └── Study Plan
-```
-
-更完整：
-
-```text
-Dataset
-   │
-   ├── File[]
-   │      ↓
-   │   ParsedContent
-   │
-   ├── Question[]
-   │      ↓
-   │   QuestionClassification
-   │
-   ├── KnowledgePoint[]
-   │
-   ├── ExamAnalysis
-   │
-   └── StudyPlan
-```
-
----
-
-## 22. Backend 目录与架构对应关系
-
-当前项目结构：
-
-```text
-backend/
-└── app/
-    ├── agents/
-    ├── api/
-    ├── routers/
-    ├── schemas/
-    ├── services/
-    └── workflows/
-```
-
-对应关系：
-
-```text
-agents/
-    ↓
-复杂开放任务
-
-api/
-    ↓
-前后端接口
-
-routers/
-    ↓
-内部路由与任务分流
-
-schemas/
-    ↓
-统一数据结构
-
-services/
-    ↓
-具体能力
-
-workflows/
-    ↓
-业务流程
-```
-
----
-
-## 23. 推荐的后端结构
-
-随着项目开发，可以逐渐形成：
-
-```text
-backend/
-│
-├── app/
-│   │
-│   ├── agents/
-│   │   ├── general_agent.py
-│   │   └── ...
-│   │
-│   ├── api/
-│   │   ├── final_sprint.py
-│   │   ├── homework.py
-│   │   ├── chat.py
-│   │   └── settings.py
-│   │
-│   ├── routers/
-│   │   ├── main_router.py
-│   │   ├── file_router.py
-│   │   ├── question_router.py
-│   │   ├── state_router.py
-│   │   ├── model_router.py
-│   │   └── tool_router.py
-│   │
-│   ├── schemas/
-│   │   ├── dataset.py
-│   │   ├── file.py
-│   │   ├── question.py
-│   │   ├── study_plan.py
-│   │   └── agent.py
-│   │
-│   ├── services/
-│   │   ├── file_service.py
-│   │   ├── ocr_service.py
-│   │   ├── question_service.py
-│   │   ├── exam_analysis_service.py
-│   │   ├── study_plan_service.py
-│   │   ├── question_selector.py
-│   │   ├── answer_checker.py
-│   │   └── llm_service.py
-│   │
-│   └── workflows/
-│       ├── final_sprint.py
-│       └── homework.py
-│
-└── tests/
-```
-
----
-
-## 24. 期末突击的代码调用关系
-
-```text
-POST /api/final-sprint/upload
-        ↓
-FinalSprintWorkflow
-        ↓
-BatchFileProcessor
-        ↓
-FileRouter
-        ↓
-FileService / OCRService
-        ↓
-QuestionService
-        ↓
-QuestionRouter
-        ↓
-QuestionBank
-        ↓
-ExamAnalysisService
-        ↓
-StudyPlanService
-        ↓
-QuestionSelector
-        ↓
-API Response
-```
-
----
-
-## 25. 日常作业的代码调用关系
-
-```text
-POST /api/homework/upload
-        ↓
-HomeworkWorkflow
-        ↓
-FileRouter
-        ↓
-FileService / OCRService
-        ↓
-QuestionService
-        ↓
-QuestionRouter
-        ↓
-HomeworkStateRouter
-        ↓
-AnswerChecker
-        ↓
-必要时调用 LLM / Agent
-        ↓
-API Response
-```
-
----
-
-## 26. 其它问题的代码调用关系
-
-```text
-POST /api/chat
-        ↓
-Main Router
-        ↓
-General Agent
-        ↓
-Request Router
-        ↓
-Complexity Router
-        ↓
-Tool Router / Model Router
-        ↓
-调用对应能力
-        ↓
-General Agent
-        ↓
-API Response
-```
-
----
-
-## 27. Agent 与 Router 的关系
-
-Agent 不应该直接决定所有底层实现。
+三人协作时必须明确文件所有权。
 
 推荐：
 
 ```text
-General Agent
-      ↓
-Router
-      ↓
-Tool / Model / Knowledge
-      ↓
-返回结果
-      ↓
-Agent 综合
-      ↓
-最终回答
-```
-
-Agent 更关注：
-
-> **“我要完成什么任务？”**
-
-Router 更关注：
-
-> **“这个任务应该交给谁处理？”**
-
----
-
-## 28. 前后端接口原则
-
-前后端通过 API 进行通信。
-
-Frontend 不直接访问：
-
-* LLM API
-* OCR API
-* 文件解析器
-* 数据库
-* Agent
-
-统一：
-
-```text
 Frontend
-   ↓
-Backend API
-   ↓
-Workflow / Agent
-```
-
-这样可以避免 API Key 暴露在浏览器端。
-
----
-
-## 29. API 请求示例
-
-### 29.1 创建期末复习任务
-
-```json
-POST /api/final-sprint/create
-
-{
-  "course": "高等数学",
-  "exam_date": "2026-08-30",
-  "daily_study_hours": 4
-}
-```
-
-返回：
-
-```json
-{
-  "dataset_id": "dataset_001",
-  "status": "created"
-}
-```
-
----
-
-### 29.2 批量上传文件
-
-```text
-POST /api/final-sprint/upload
-```
-
-请求：
-
-```text
-dataset_id
-files[]
-```
-
-返回：
-
-```json
-{
-  "dataset_id": "dataset_001",
-  "files": [
-    {
-      "file_id": "file_001",
-      "name": "2024期末试题.pdf",
-      "status": "processing"
-    },
-    {
-      "file_id": "file_002",
-      "name": "2025期末试题.docx",
-      "status": "processing"
-    }
-  ]
-}
-```
-
----
-
-## 30. API Response 统一原则
-
-所有 API 返回尽量保持统一结构。
-
-```json
-{
-  "success": true,
-  "data": {},
-  "error": null
-}
-```
-
-失败时：
-
-```json
-{
-  "success": false,
-  "data": null,
-  "error": {
-    "code": "FILE_PARSE_ERROR",
-    "message": "文件解析失败"
-  }
-}
-```
-
-这样前端不需要针对每个接口设计完全不同的错误处理方式。
-
----
-
-## 31. 错误处理原则
-
-任何一个子任务失败，不应该默认导致整个 Workflow 崩溃。
-
-例如：
-
-```text
-上传 10 个文件
-        ↓
-其中 1 个 PDF OCR 失败
-        ↓
-其他 9 个文件继续处理
-        ↓
-最终告诉用户：
-9 个文件成功
-1 个文件失败
-```
-
-而不是：
-
-```text
-1 个文件失败
- ↓
-整个任务失败
-```
-
-批处理任务应该尽量支持：
-
-```text
-partial success
-```
-
-即：
-
-> **允许部分成功。**
-
----
-
-## 32. 异步任务原则
-
-批量文件解析、OCR、题目分类等任务可能耗时较长。
-
-因此不要让前端一直等待一个 HTTP 请求。
-
-推荐：
-
-```text
-用户上传文件
-        ↓
-API
-        ↓
-创建后台任务
-        ↓
-返回 task_id
-        ↓
-后台处理
-        ↓
-Frontend 查询任务状态
-```
-
-例如：
-
-```json
-{
-  "task_id": "task_001",
-  "status": "processing"
-}
-```
-
-前端可以显示：
-
-```text
-正在处理资料...
-
-████████████░░░░ 75%
-
-已处理 6 / 8 个文件
-```
-
----
-
-## 33. Vibe Coding 开发原则
-
-团队使用 AI Coding 工具开发时，所有成员必须遵守：
-
-> **先阅读 docs，再写代码。**
-
-AI 在生成代码前应该知道：
-
-```text
-PRODUCT.md
-WORKFLOW.md
-ARCHITECTURE.md
-API.md
-DATA_SCHEMA.md
-AI_CONTEXT.md
-```
-
-避免每个人根据自己的理解生成不同架构。
-
----
-
-## 34. 模块职责边界
-
-### Frontend
-
-负责：
-
-```text
-UI
-交互
-文件选择
-API 调用
-结果展示
-```
-
-不负责：
-
-```text
-业务 Workflow
-模型选择
-API Key
-核心 AI 逻辑
-```
-
----
-
-### API
-
-负责：
-
-```text
-接收请求
-参数验证
-调用 Workflow
-返回 Response
-```
-
----
-
-### Workflow
-
-负责：
-
-```text
-组织业务流程
-决定执行顺序
-调用 Router / Service
-```
-
----
-
-### Router
-
-负责：
-
-```text
-任务分类
-能力选择
-模型选择
-工具选择
-```
-
----
-
-### Service
-
-负责：
-
-```text
-完成具体能力
-```
-
----
-
-### Agent
-
-负责：
-
-```text
-复杂任务理解
-任务规划
-多步骤执行
-开放问题回答
-```
-
----
-
-## 35. 最重要的架构原则
-
-Lingxi-claw 的核心调用链：
-
-```text
-                USER
-                  │
-                  ↓
-             FRONTEND
-                  │
-                  ↓
-              API LAYER
-                  │
-                  ↓
-             MAIN ROUTER
-                  │
-          ┌───────┴────────┐
-          ↓                ↓
-      WORKFLOW           AGENT
-          │                │
-          └───────┬────────┘
-                  ↓
-           INTERNAL ROUTERS
-                  │
-       ┌──────────┼──────────┐
-       ↓          ↓          ↓
-     FILE       TASK       MODEL
-    ROUTER      ROUTER     ROUTER
-       │          │          │
-       ↓          ↓          ↓
-   PARSER       SKILL       LLM
-   / OCR        / TOOL     PROVIDER
-       │          │          │
-       └──────────┼──────────┘
-                  ↓
-              SERVICES
-                  ↓
-             DATA / KB
-                  ↓
-              RESULT
-                  ↓
-             API RESPONSE
-                  ↓
-              FRONTEND
-                  ↓
-                USER
-```
-
----
-
-## 36. 最终架构总结
-
-Lingxi-claw 的系统架构可以概括为：
-
-> **用户通过 Sidebar 主动选择学习场景，Backend 根据场景进入对应 Workflow 或 General Agent；Workflow / Agent 在执行过程中通过多个轻量 Router，对文件类型、题型、用户学习状态、工具和模型进行精准分流，再由 Services 完成具体任务，最终将结构化结果返回前端。**
-
-核心链路：
-
-```text
-用户点击 Sidebar
-        ↓
-选择学习模式
-        ↓
-Workflow / Agent
-        ↓
-内部 Router
-        ↓
-文件 / 题型 / 状态 / 工具 / 模型
-        ↓
-Services
-        ↓
-数据 / 知识库 / LLM
-        ↓
-生成结果
-        ↓
-API Response
-        ↓
-Frontend
-        ↓
-用户
-```
-
-核心原则：
-
-```text
-Workflow 优先
-        +
-Agent 兜底
-        +
-Router 分流
-        +
-Service 执行
-        +
-Schema 统一数据
-        +
-API 连接前后端
-```
-
-最终形成一个：
-
-> **低成本、低延迟、模块化、可扩展的 Agent 学习系统。**
-
-````
-
-### 这个文件写完以后，你们三个人的分工就能真正对上了
-
-```text
-A：后端核心逻辑
-│
-├── workflows/
-├── routers/
+├── frontend/pages/
+├── frontend/components/
+├── frontend/styles/
+└── frontend/routes/
+
+Backend
+├── backend/
 ├── services/
-├── agents/
-└── schemas/
+└── AI / Workflow
 
-B：前端
-│
-└── frontend/
-
-C：数据 / 测试 / 部署
-│
-├── data/
+QA
 ├── tests/
-└── infra/
+├── test reports
+└── test documentation
+```
+
+共享文件：
+
+```text
+docs/
+API Types
+package.json
+配置文件
+```
+
+共享文件必须：
+
+> **先约定，再修改。**
+
+---
+
+# 29. Vibe Coding 协作规则
+
+由于项目使用 Kilo Code 等 AI Coding Agent，必须限制 AI 的修改范围。
+
+每次任务应该明确：
+
+```text
+1. 修改哪些文件
+2. 不允许修改哪些文件
+3. 当前任务目标
+4. 不实现哪些功能
+5. 完成后的验证方式
+```
+
+例如 Frontend：
+
+```text
+任务：
+完善 CourseSpace.tsx 页面。
+
+允许修改：
+frontend/pages/CourseSpace.tsx
+
+禁止修改：
+App.tsx
+services/
+API types
+backend/
+其他 pages/
+
+要求：
+1. 保持现有路由
+2. 使用已有 AppShell
+3. 使用已有 Card / PageHeader
+4. 使用 Mock Data
+5. 不实现真实 AI
+6. npm run build 必须通过
+```
+
+---
+
+# 30. 开发流程
+
+推荐开发流程：
+
+```text
+Product
+    ↓
+Workflow
+    ↓
+Architecture
+    ↓
+API Contract
+    ↓
+Frontend / Backend
+    ↓
+Integration
+    ↓
+QA
+```
+
+具体：
+
+```text
+产品定义
+    ↓
+确定页面与用户流程
+    ↓
+确定 Workflow
+    ↓
+确定数据模型
+    ↓
+确定 API
+    ↓
+Frontend / Backend 并行开发
+    ↓
+API 联调
+    ↓
+QA 测试
+    ↓
+修复问题
+    ↓
+Demo
+```
+
+---
+
+# 31. 系统最终架构
+
+最终 Lingxi-claw 的完整技术架构：
+
+```text
+                         User
+                           │
+                           ↓
+                    ┌─────────────┐
+                    │  Frontend   │
+                    │             │
+                    │ Onboarding  │
+                    │ Home        │
+                    │ Courses     │
+                    │ CourseSpace │
+                    │ Analytics   │
+                    │ Settings    │
+                    └──────┬──────┘
+                           │
+                         API
+                           │
+                           ↓
+                    ┌─────────────┐
+                    │   Backend   │
+                    │             │
+                    │ User        │
+                    │ Course      │
+                    │ Task        │
+                    │ Data        │
+                    └──────┬──────┘
+                           │
+                           ↓
+                 ┌───────────────────┐
+                 │ AI Orchestration  │
+                 │                   │
+                 │ Task Router       │
+                 │      ↓            │
+                 │ Workflow / Agent  │
+                 │      ↓            │
+                 │ Skill / Tool      │
+                 └────────┬──────────┘
+                          │
+             ┌────────────┼────────────┐
+             ↓            ↓            ↓
+        File Parser    Knowledge     Model
+        OCR / Vision     Base       Service
+             │            │            │
+             └────────────┼────────────┘
+                          ↓
+                    Learning Data
+                          │
+             ┌────────────┼────────────┐
+             ↓            ↓            ↓
+          Homework      Mistakes   Analytics
+             │            │            │
+             └────────────┼────────────┘
+                          ↓
+                   AI Suggestions
+                          │
+                          ↓
+                       Home
+```
+
+---
+
+# 32. 架构核心原则
+
+Lingxi-claw 遵循以下架构原则：
+
+### 1. Product First
+
+技术架构服务于产品信息架构。
+
+### 2. Course Centered
+
+课程是用户学习数据组织的核心单位。
+
+### 3. Frontend / Backend Separation
+
+Frontend 负责展示与交互，Backend 负责业务与 AI 能力。
+
+### 4. Workflow First
+
+明确、结构化的任务优先进入 Workflow。
+
+### 5. Agent Fallback
+
+开放、复杂、未知任务由 General Agent 处理。
+
+### 6. API Contract
+
+Frontend 与 Backend 通过明确 API Contract 协作。
+
+### 7. Mock First
+
+早期开发优先使用 Mock，降低并行开发耦合。
+
+### 8. Preserve Existing Capability
+
+新架构不能破坏已有 services、API、Mock 和 LegacyApp。
+
+### 9. Small Scope for Vibe Coding
+
+AI Coding Agent 每次只处理明确、小范围的任务。
+
+### 10. Testable
+
+每一个页面、API 和 Workflow 都必须能够独立验证。
+
+---
+
+# 33. 当前阶段的一句话架构总结
+
+> **Lingxi-claw 以课程为产品核心，以 Course Space 为主要学习工作空间，通过 Frontend + Backend + API Contract 解耦协作，并在后端通过 Workflow + Agent + Router 逐步构建真正的 AI 学习能力；V02 阶段优先完成产品架构、页面框架、路由和 Mock 联调，不提前实现真实 AI 能力。**
