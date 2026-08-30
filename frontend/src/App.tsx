@@ -1,4 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import AppShell from './components/AppShell'
+import Home from './pages/Home'
+import Courses from './pages/Courses'
+import CourseSpace from './pages/CourseSpace'
+import Analytics from './pages/Analytics'
+import Settings from './pages/Settings'
 
 const modes = [
   {
@@ -65,7 +72,7 @@ function buildPlans(days: number) {
   return plans
 }
 
-function App() {
+function LegacyApp() {
   const [currentMode, setCurrentMode] = useState('final-sprint')
   const current = modes.find((m) => m.id === currentMode) || modes[0]
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
@@ -584,6 +591,53 @@ function App() {
       </div>
     )
   }
+
+  return (
+    <div className="app-layout">
+      <aside className="sidebar">
+        <div className="sidebar-header">
+          <div className="sidebar-title">灵犀-Claw</div>
+          <div className="sidebar-subtitle">Study with 灵犀-Claw</div>
+        </div>
+        <nav className="sidebar-nav">
+          {modes.map((mode) => (
+            <div
+              key={mode.id}
+              className={`sidebar-item ${currentMode === mode.id ? 'active' : ''}`}
+              onClick={() => setCurrentMode(mode.id)}
+            >
+              {mode.label}
+            </div>
+          ))}
+        </nav>
+      </aside>
+      <main className="main-content">
+        <div className="mode-panel">
+          <div className="mode-icon">{current.label.split(' ')[0]}</div>
+          <h1>{current.title}</h1>
+          <p className="subtitle">{current.description}</p>
+        </div>
+      </main>
+    </div>
+  )
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Navigate to="/home" replace />} />
+        <Route element={<AppShell />}>
+          <Route path="/home" element={<Home />} />
+          <Route path="/courses" element={<Courses />} />
+          <Route path="/courses/:courseId" element={<CourseSpace />} />
+          <Route path="/analytics" element={<Analytics />} />
+          <Route path="/settings" element={<Settings />} />
+        </Route>
+        <Route path="*" element={<LegacyApp />} />
+      </Routes>
+    </BrowserRouter>
+  )
 }
 
 export default App
