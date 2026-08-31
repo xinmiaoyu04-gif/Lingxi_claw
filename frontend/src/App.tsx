@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { api, waitForTask, type AgentSettings, type Analysis, type Dataset, type Homework, type HomeworkResult, type Plan } from './api/client'
 import AppShell from './components/AppShell'
 import Home from './pages/Home'
 import Courses from './pages/Courses'
@@ -34,55 +35,124 @@ const modes = [
   },
 ]
 
-const analysisResult = {
-  knowledgePoints: ['二重积分', '条件概率', '随机变量分布', '无穷级数'],
-  questionTypes: [
-    { name: '判别级数敛散性', level: '高频' },
-    { name: '幂级数求和', level: '高频' },
-    { name: '傅里叶展开', level: '中等' },
-  ],
-}
-
-const basePlans = [
-  {
-    title: '高频考点复习',
-    items: ['二重积分', '条件概率', '完成基础计算题', '整理核心公式'],
-  },
-  {
-    title: '综合题训练',
-    items: ['随机变量分布', '无穷级数', '完成综合练习', '整理错题'],
-  },
-  {
-    title: '最后冲刺',
-    items: ['模拟考试', '高频题型回顾', '完成一套模拟题', '查漏补缺'],
-  },
-]
-
-function buildPlans(days: number) {
-  const safe = Math.max(1, days)
-  const plans = basePlans.slice(0, Math.min(safe, 3))
-  if (safe > 3) {
-    for (let i = 4; i <= safe; i++) {
-      plans.push({
-        title: `第 ${i} 天：自主复习`,
-        items: ['复习错题本', '回顾高频公式', '保持做题手感'],
-      })
-    }
-  }
-  return plans
-}
-
 function LegacyApp() {
   const [currentMode, setCurrentMode] = useState('final-sprint')
   const current = modes.find((m) => m.id === currentMode) || modes[0]
+  const [datasetName, setDatasetName] = useState('高等数学期末突击')
+  const [datasetCourse, setDatasetCourse] = useState('高等数学')
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [step, setStep] = useState<'idle' | 'analyzing' | 'analyzed' | 'planning' | 'planned'>('idle')
   const [days, setDays] = useState(3)
+  const [dataset, setDataset] = useState<Dataset | null>(null)
+  const [analysis, setAnalysis] = useState<Analysis | null>(null)
+  const [plan, setPlan] = useState<Plan | null>(null)
+  const [fsError, setFsError] = useState<string | null>(null)
+  const [fsMessage, setFsMessage] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const runAnalysis = async () => {
+    if (selectedFiles.length === 0) return
+    setFsError(null)
+    setStep('analyzing')
+    try {
+      setFsMessage('正在创建数据集...')
+      const ds = await api.createDataset(datasetName.trim() || '期末突击', datasetCourse.trim() || '高等数学')
+      setDataset(ds)
+      setFsMessage('正在上传并解析资料...')
+      const upload = await api.uploadDatasetFiles(ds.dataset_id, selectedFiles)
+      await waitForTask(upload.task_id)
+      setFsMessage('正在分析历年题...')
+      const analysisTask = await api.startAnalysis(ds.dataset_id)
+      await waitForTask(analysisTask.task_id)
+      setAnalysis(await api.getAnalysis(ds.dataset_id))
+      setStep('analyzed')
+    } catch (e) {
+      setFsError(e instanceof Error ? e.message : String(e))
+      setStep('idle')
+    }
+  }
+
+  const runPlan = async () => {
+    if (!dataset) return
+    setFsError(null)
+    setStep('planning')
+    try {
+      const examDate = new Date(Date.now() + days * 86400000).toISOString().slice(0, 10)
+      const planTask = await api.startPlan(dataset.dataset_id, {
+        exam_date: examDate,
+        daily_study_hours: 4,
+        current_level: 'medium',
+      })
+      await waitForTask(planTask.task_id)
+      setPlan(await api.getPlan(dataset.dataset_id))
+      setStep('planned')
+    } catch (e) {
+      setFsError(e instanceof Error ? e.message : String(e))
+      setStep('analyzed')
+    }
+  }
+
+  const [homeworkCourse, setHomeworkCourse] = useState('高等数学')
   const [homeworkFiles, setHomeworkFiles] = useState<File[]>([])
-  const [homeworkStep, setHomeworkStep] = useState<'idle' | 'analyzing' | 'analyzed'>('idle')
+  const [homeworkStep, setHomeworkStep] = useState<'idle' | 'processing' | 'ready'>('idle')
+  const [homework, setHomework] = useState<Homework | null>(null)
+  const [hwError, setHwError] = useState<string | null>(null)
+  const [hwMessage, setHwMessage] = useState('')
+  const [hints, setHints] = useState<Record<string, string>>({})
+  const [answers, setAnswers] = useState<Record<string, string>>({})
+  const [results, setResults] = useState<Record<string, HomeworkResult>>({})
+  const [busyQuestion, setBusyQuestion] = useState<string | null>(null)
   const homeworkInputRef = useRef<HTMLInputElement>(null)
+
+  const runHomeworkAnalysis = async () => {
+    const file = homeworkFiles[0]
+    if (!file) return
+    setHwError(null)
+    setHomeworkStep('processing')
+    try {
+      setHwMessage('正在上传作业...')
+      const upload = await api.uploadHomework(homeworkCourse.trim() || '高等数学', file)
+      setHwMessage('正在识别题目...')
+      await waitForTask(upload.task_id)
+      const hw = await api.getHomework(upload.homework_id)
+      setHomework(hw)
+      setHints({})
+      setAnswers({})
+      setResults({})
+      setHomeworkStep('ready')
+    } catch (e) {
+      setHwError(e instanceof Error ? e.message : String(e))
+      setHomeworkStep('idle')
+    }
+  }
+
+  const askHint = async (questionId: string) => {
+    if (!homework) return
+    setBusyQuestion(questionId)
+    try {
+      const hint = await api.homeworkHint(homework.homework_id, questionId, '我不知道从哪里开始')
+      setHints((s) => ({ ...s, [questionId]: hint.response }))
+    } catch (e) {
+      setHwError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusyQuestion(null)
+    }
+  }
+
+  const submitAnswer = async (questionId: string) => {
+    if (!homework) return
+    const answer = (answers[questionId] ?? '').trim()
+    if (!answer) return
+    setBusyQuestion(questionId)
+    try {
+      const result = await api.homeworkAnswer(homework.homework_id, questionId, answer)
+      setResults((s) => ({ ...s, [questionId]: result }))
+    } catch (e) {
+      setHwError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusyQuestion(null)
+    }
+  }
 
   const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([
     { role: 'assistant', content: '有什么学习问题想问我？' },
@@ -91,29 +161,34 @@ function LegacyApp() {
   const [isThinking, setIsThinking] = useState(false)
   const chatEndRef = useRef<HTMLDivElement>(null)
 
-  const [agentResponseStyle, setAgentResponseStyle] = useState<'concise' | 'normal' | 'detailed'>('normal')
-  const [agentGuideFirst, setAgentGuideFirst] = useState(true)
-  const [agentNoDirectAnswer, setAgentNoDirectAnswer] = useState(true)
-  const [agentStepByStep, setAgentStepByStep] = useState(true)
-  const [agentSaved, setAgentSaved] = useState(false)
+  const [settings, setSettings] = useState<AgentSettings>({ response_style: 'detailed', personality: 'encouraging', answer_policy: 'hint_first' })
+  const [settingsLoaded, setSettingsLoaded] = useState(false)
+  const [settingsSaving, setSettingsSaving] = useState(false)
+  const [settingsSaved, setSettingsSaved] = useState(false)
+  const [settingsError, setSettingsError] = useState<string | null>(null)
+
+  useEffect(() => {
+    api.getAgentSettings()
+      .then(setSettings)
+      .catch((e: unknown) => setSettingsError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setSettingsLoaded(true))
+  }, [])
 
   const resetAgentSettings = () => {
-    setAgentResponseStyle('normal')
-    setAgentGuideFirst(true)
-    setAgentNoDirectAnswer(true)
-    setAgentStepByStep(true)
+    setSettings({ response_style: 'detailed', personality: 'encouraging', answer_policy: 'hint_first' })
   }
 
   const saveAgentSettings = () => {
-    setAgentSaved(true)
-    setTimeout(() => setAgentSaved(false), 2000)
-  }
-
-  const getMockReply = (text: string) => {
-    if (text.includes('概率')) return '概率是研究随机事件发生可能性的数学分支，常用条件概率、贝叶斯公式等工具来分析事件之间的关系。'
-    if (text.includes('积分')) return '积分是微积分中的核心概念之一，常用于求面积、体积、平均值等，常见方法包括换元法和分部积分法。'
-    if (text.includes('Python')) return '学习 Python 建议先从变量、条件、循环和函数入手，再逐步学习数据结构、面向对象和常用标准库。'
-    return '这是一个很好的学习问题。我们可以先分析题目的核心概念，再一步一步解决它。'
+    setSettingsSaving(true)
+    setSettingsError(null)
+    api.updateAgentSettings(settings)
+      .then((s) => {
+        setSettings(s)
+        setSettingsSaved(true)
+        setTimeout(() => setSettingsSaved(false), 2000)
+      })
+      .catch((e: unknown) => setSettingsError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setSettingsSaving(false))
   }
 
   const sendChat = () => {
@@ -122,10 +197,14 @@ function LegacyApp() {
     setChatMessages((s) => [...s, { role: 'user', content: text }])
     setChatInput('')
     setIsThinking(true)
-    setTimeout(() => {
-      setChatMessages((s) => [...s, { role: 'assistant', content: getMockReply(text) }])
-      setIsThinking(false)
-    }, 1000)
+    api.chat(text)
+      .then((reply) => {
+        setChatMessages((s) => [...s, { role: 'assistant', content: reply.message }])
+      })
+      .catch((e: unknown) => {
+        setChatMessages((s) => [...s, { role: 'assistant', content: `⚠️ ${e instanceof Error ? e.message : '请求失败'}` }])
+      })
+      .finally(() => setIsThinking(false))
   }
 
   useEffect(() => {
@@ -160,12 +239,34 @@ function LegacyApp() {
 
             {step === 'idle' && (
               <>
+                <div className="result-section">
+                  <div className="result-title">数据集名称</div>
+                  <input
+                    className="days-input"
+                    value={datasetName}
+                    onChange={(e) => setDatasetName(e.target.value)}
+                    placeholder="例如：高等数学期末突击"
+                    style={{ width: '100%', maxWidth: 360 }}
+                  />
+                </div>
+
+                <div className="result-section">
+                  <div className="result-title">所属课程</div>
+                  <input
+                    className="days-input"
+                    value={datasetCourse}
+                    onChange={(e) => setDatasetCourse(e.target.value)}
+                    placeholder="例如：高等数学"
+                    style={{ width: '100%', maxWidth: 360 }}
+                  />
+                </div>
+
                 <div
                   className="upload-area"
                   onClick={() => fileInputRef.current?.click()}
                 >
                   <div className="upload-hint">点击选择学习资料</div>
-                  <div className="upload-types">支持 PDF、图片、Word、文本文件</div>
+                  <div className="upload-types">支持 PDF、Word、图片</div>
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -192,13 +293,14 @@ function LegacyApp() {
                   </div>
                 )}
 
+                {fsError && (
+                  <div className="analysis-message" style={{ color: '#b91c1c', borderColor: '#fecaca', background: '#fef2f2' }}>⚠️ {fsError}</div>
+                )}
+
                 <button
                   className="primary-button"
                   disabled={selectedFiles.length === 0}
-                  onClick={() => {
-                    setStep('analyzing')
-                    setTimeout(() => setStep('analyzed'), 1500)
-                  }}
+                  onClick={runAnalysis}
                 >
                   开始分析资料
                 </button>
@@ -207,23 +309,26 @@ function LegacyApp() {
 
             {step === 'analyzing' && (
               <div className="analyze-loading">
-                <div className="analyze-loading-text">正在分析学习资料...</div>
+                <div className="analyze-loading-text">{fsMessage || '正在分析学习资料...'}</div>
                 <div className="analyze-loading-sub">正在处理 {selectedFiles.length} 份资料</div>
               </div>
             )}
 
-            {step === 'analyzed' && (
+            {step === 'analyzed' && analysis && (
               <div className="analyze-result">
                 <div className="analyze-result-header">
                   <div className="analyze-result-title">资料分析完成</div>
-                  <div className="analyze-result-sub">已分析 {selectedFiles.length} 份学习资料</div>
+                  <div className="analyze-result-sub">{analysis.course} · 共识别 {analysis.total_questions} 道题</div>
                 </div>
 
                 <div className="result-section">
                   <div className="result-title">高频考点</div>
                   <div className="result-list">
-                    {analysisResult.knowledgePoints.map((item) => (
-                      <div key={item} className="result-item">{item}</div>
+                    {analysis.knowledge_points.map((item) => (
+                      <div key={item.name} className="result-item">
+                        <span>{item.name}</span>
+                        <span className="result-badge">出现 {item.frequency} 次</span>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -231,10 +336,10 @@ function LegacyApp() {
                 <div className="result-section">
                   <div className="result-title">高频题型</div>
                   <div className="result-list">
-                    {analysisResult.questionTypes.map((item) => (
+                    {analysis.question_types.map((item) => (
                       <div key={item.name} className="result-item">
                         <span>{item.name}</span>
-                        <span className="result-badge">{item.level}</span>
+                        <span className="result-badge">{item.count} 题</span>
                       </div>
                     ))}
                   </div>
@@ -259,14 +364,15 @@ function LegacyApp() {
                   />
                 </div>
 
+                {fsError && (
+                  <div className="analysis-message" style={{ color: '#b91c1c', borderColor: '#fecaca', background: '#fef2f2' }}>⚠️ {fsError}</div>
+                )}
+
                 <div className="result-actions">
-                  <button className="primary-button" onClick={() => {
-                    setStep('planning')
-                    setTimeout(() => setStep('planned'), 1000)
-                  }}>
+                  <button className="primary-button" onClick={runPlan}>
                     生成我的冲刺计划
                   </button>
-                  <button className="secondary-button" onClick={() => { setStep('idle'); setSelectedFiles([]) }}>
+                  <button className="secondary-button" onClick={() => { setStep('idle'); setSelectedFiles([]); setAnalysis(null); setDataset(null) }}>
                     重新选择资料
                   </button>
                 </div>
@@ -280,20 +386,19 @@ function LegacyApp() {
               </div>
             )}
 
-            {step === 'planned' && (
+            {step === 'planned' && plan && (
               <div className="plan-result">
                 <div className="plan-header">
                   <div className="plan-title">📅 我的期末冲刺计划</div>
-                  <div className="plan-subtitle">距离考试还有 {days} 天</div>
+                  <div className="plan-subtitle">距离考试还有 {plan.days_remaining} 天</div>
                 </div>
 
                 <div className="plan-list">
-                  {buildPlans(days).map((plan, index) => (
-                    <div key={index} className="plan-card">
-                      <div className="plan-day">Day {index + 1}</div>
-                      <div className="plan-day-title">{plan.title}</div>
+                  {plan.daily_plan.map((day) => (
+                    <div key={day.day} className="plan-card">
+                      <div className="plan-day">Day {day.day} · 约 {day.estimated_hours} 小时 · {day.practice_count} 题</div>
                       <ul className="plan-items">
-                        {plan.items.map((item) => (
+                        {day.focus.map((item) => (
                           <li key={item}>{item}</li>
                         ))}
                       </ul>
@@ -305,7 +410,7 @@ function LegacyApp() {
                   <button className="secondary-button" onClick={() => setStep('analyzed')}>
                     重新制定计划
                   </button>
-                  <button className="secondary-button" onClick={() => { setStep('idle'); setSelectedFiles([]) }}>
+                  <button className="secondary-button" onClick={() => { setStep('idle'); setSelectedFiles([]); setAnalysis(null); setDataset(null); setPlan(null) }}>
                     重新选择资料
                   </button>
                 </div>
@@ -345,16 +450,26 @@ function LegacyApp() {
 
             {homeworkStep === 'idle' && (
               <>
+                <div className="result-section">
+                  <div className="result-title">所属课程</div>
+                  <input
+                    className="days-input"
+                    value={homeworkCourse}
+                    onChange={(e) => setHomeworkCourse(e.target.value)}
+                    placeholder="例如：高等数学"
+                    style={{ width: '100%', maxWidth: 360 }}
+                  />
+                </div>
+
                 <div
                   className="upload-area"
                   onClick={() => homeworkInputRef.current?.click()}
                 >
                   <div className="upload-hint">点击上传作业题目</div>
-                  <div className="upload-types">支持图片和常见文档格式</div>
+                  <div className="upload-types">支持图片、PDF、Word（单张作业）</div>
                   <input
                     ref={homeworkInputRef}
                     type="file"
-                    multiple
                     className="hidden-input"
                     onChange={(e) => {
                       const files = Array.from(e.target.files || [])
@@ -365,7 +480,7 @@ function LegacyApp() {
 
                 {homeworkFiles.length > 0 && (
                   <div className="file-summary">
-                    <div className="file-summary-title">已选择 {homeworkFiles.length} 个文件</div>
+                    <div className="file-summary-title">已选择 1 个文件</div>
                     <div className="file-list">
                       {homeworkFiles.map((file, index) => (
                         <div key={index} className="file-item">
@@ -377,61 +492,93 @@ function LegacyApp() {
                   </div>
                 )}
 
+                {hwError && (
+                  <div className="analysis-message" style={{ color: '#b91c1c', borderColor: '#fecaca', background: '#fef2f2' }}>⚠️ {hwError}</div>
+                )}
+
                 <button
                   className="primary-button"
                   disabled={homeworkFiles.length === 0}
-                  onClick={() => {
-                    setHomeworkStep('analyzing')
-                    setTimeout(() => setHomeworkStep('analyzed'), 1000)
-                  }}
+                  onClick={runHomeworkAnalysis}
                 >
                   开始解析题目
                 </button>
               </>
             )}
 
-            {homeworkStep === 'analyzing' && (
+            {homeworkStep === 'processing' && (
               <div className="analyze-loading">
-                <div className="analyze-loading-text">正在解析你的作业题目...</div>
-                <div className="analyze-loading-sub">正在处理 {homeworkFiles.length} 个文件</div>
+                <div className="analyze-loading-text">{hwMessage || '正在解析你的作业题目...'}</div>
+                <div className="analyze-loading-sub">请稍候</div>
               </div>
             )}
 
-            {homeworkStep === 'analyzed' && (
+            {homeworkStep === 'ready' && homework && (
               <div className="homework-result">
                 <div className="analyze-result-header">
                   <div className="analyze-result-title">题目解析完成</div>
-                  <div className="analyze-result-sub">已解析 {homeworkFiles.length} 个文件</div>
+                  <div className="analyze-result-sub">识别出 {homework.questions?.length ?? 0} 道题</div>
                 </div>
 
-                <div className="result-section">
-                  <div className="result-title">题目类型</div>
-                  <div className="result-item">计算题</div>
-                </div>
+                {homework.questions?.map((q) => {
+                  const result = results[q.question_id]
+                  const answer = answers[q.question_id] ?? ''
+                  return (
+                    <div key={q.question_id} className="homework-step" style={{ padding: 14, marginTop: 12 }}>
+                      <div style={{ fontWeight: 600 }}>{q.content}</div>
+                      <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>{q.knowledge_point} · 难度 {q.difficulty}</div>
 
-                <div className="result-section">
-                  <div className="result-title">涉及知识点</div>
-                  <div className="result-list">
-                    <div className="result-item">条件概率</div>
-                    <div className="result-item">贝叶斯公式</div>
-                  </div>
-                </div>
+                      <div style={{ marginTop: 10 }}>
+                        <button className="secondary-button" onClick={() => askHint(q.question_id)} disabled={busyQuestion === q.question_id}>
+                          获取提示
+                        </button>
+                      </div>
+                      {hints[q.question_id] && <div style={{ marginTop: 8, color: '#065f46' }}>💡 {hints[q.question_id]}</div>}
 
-                <div className="result-section">
-                  <div className="result-title">解题思路</div>
-                  <div className="homework-steps">
-                    <div className="homework-step">1. 先确定已知条件和要求的目标事件</div>
-                    <div className="homework-step">2. 将题目转换为概率表达式</div>
-                    <div className="homework-step">3. 判断是否需要使用条件概率公式</div>
-                    <div className="homework-step">4. 代入数据并完成计算</div>
-                  </div>
-                </div>
+                      <textarea
+                        className="chat-input"
+                        style={{ marginTop: 10, width: '100%', minHeight: 64, resize: 'vertical', boxSizing: 'border-box' }}
+                        placeholder="写下你的答案..."
+                        value={answer}
+                        onChange={(e) => setAnswers((s) => ({ ...s, [q.question_id]: e.target.value }))}
+                      />
+
+                      <div style={{ marginTop: 10 }}>
+                        <button
+                          className="primary-button"
+                          style={{ marginTop: 0 }}
+                          onClick={() => submitAnswer(q.question_id)}
+                          disabled={busyQuestion === q.question_id || !answer.trim()}
+                        >
+                          提交答案
+                        </button>
+                      </div>
+
+                      {result && (
+                        <div style={{ marginTop: 10 }}>
+                          <div className="homework-step" style={{ background: result.correct ? '#ecfdf5' : '#fef2f2', borderColor: result.correct ? '#bbf7d0' : '#fecaca' }}>
+                            {result.correct ? '✓ 回答正确' : '✗ 还需改进'}（得分 {result.score}）
+                          </div>
+                          {result.feedback.map((fb) => (
+                            <div key={fb.step} className="homework-step" style={{ marginTop: 6 }}>
+                              第 {fb.step} 步 {fb.correct ? '✓' : '✗'}：{fb.message}
+                            </div>
+                          ))}
+                          {result.final_answer && (
+                            <div className="homework-step" style={{ marginTop: 6 }}>参考答案：{result.final_answer}</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+
+                {hwError && (
+                  <div className="analysis-message" style={{ color: '#b91c1c', borderColor: '#fecaca', background: '#fef2f2' }}>⚠️ {hwError}</div>
+                )}
 
                 <div className="result-actions">
-                  <button className="primary-button" onClick={() => alert('请先自己尝试完成，这里不直接展示最终答案')}>
-                    我已经尝试完成
-                  </button>
-                  <button className="secondary-button" onClick={() => { setHomeworkStep('idle'); setHomeworkFiles([]) }}>
+                  <button className="secondary-button" onClick={() => { setHomeworkStep('idle'); setHomeworkFiles([]); setHomework(null) }}>
                     换一道题
                   </button>
                 </div>
@@ -527,65 +674,78 @@ function LegacyApp() {
             <h1>{current.title}</h1>
             <p className="subtitle">{current.description}</p>
 
-            <div className="settings-section">
-              <div className="settings-title">回答风格</div>
-              <div className="settings-options">
-                {[
-                  { value: 'concise', label: '极速简洁' },
-                  { value: 'normal', label: '标准讲解' },
-                  { value: 'detailed', label: '详细教学' },
-                ].map((option) => (
-                  <button
-                    key={option.value}
-                    className={`settings-option ${agentResponseStyle === option.value ? 'active' : ''}`}
-                    onClick={() => setAgentResponseStyle(option.value as typeof agentResponseStyle)}
-                  >
-                    {option.label}
+            {!settingsLoaded ? (
+              <div className="settings-saved">正在加载 Agent 设置...</div>
+            ) : (
+              <>
+                <div className="settings-section">
+                  <div className="settings-title">回答风格</div>
+                  <div className="settings-options">
+                    {([
+                      { value: 'detailed', label: '详细教学' },
+                      { value: 'concise', label: '极速简洁' },
+                    ] as const).map((option) => (
+                      <button
+                        key={option.value}
+                        className={`settings-option ${settings.response_style === option.value ? 'active' : ''}`}
+                        onClick={() => setSettings((s) => ({ ...s, response_style: option.value }))}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="settings-section">
+                  <div className="settings-title">讲解性格</div>
+                  <div className="settings-options">
+                    {([
+                      { value: 'encouraging', label: '鼓励型' },
+                      { value: 'strict', label: '严格型' },
+                      { value: 'neutral', label: '中立型' },
+                    ] as const).map((option) => (
+                      <button
+                        key={option.value}
+                        className={`settings-option ${settings.personality === option.value ? 'active' : ''}`}
+                        onClick={() => setSettings((s) => ({ ...s, personality: option.value }))}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="settings-section">
+                  <div className="settings-title">答题策略</div>
+                  <div className="settings-options">
+                    {([
+                      { value: 'hint_first', label: '先给提示' },
+                      { value: 'direct_answer', label: '直接给答案' },
+                    ] as const).map((option) => (
+                      <button
+                        key={option.value}
+                        className={`settings-option ${settings.answer_policy === option.value ? 'active' : ''}`}
+                        onClick={() => setSettings((s) => ({ ...s, answer_policy: option.value }))}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="settings-actions">
+                  <button className="primary-button" onClick={saveAgentSettings} disabled={settingsSaving}>
+                    {settingsSaving ? '保存中...' : '保存我的 Agent 设置'}
                   </button>
-                ))}
-              </div>
-            </div>
+                  <button className="secondary-button" onClick={resetAgentSettings}>
+                    恢复默认设置
+                  </button>
+                </div>
 
-            <div className="settings-section">
-              <div className="settings-title">学习方式</div>
-              <div className="settings-toggles">
-                <label className="settings-toggle">
-                  <input
-                    type="checkbox"
-                    checked={agentGuideFirst}
-                    onChange={(e) => setAgentGuideFirst(e.target.checked)}
-                  />
-                  <span>优先引导我思考</span>
-                </label>
-                <label className="settings-toggle">
-                  <input
-                    type="checkbox"
-                    checked={agentNoDirectAnswer}
-                    onChange={(e) => setAgentNoDirectAnswer(e.target.checked)}
-                  />
-                  <span>不直接给出最终答案</span>
-                </label>
-                <label className="settings-toggle">
-                  <input
-                    type="checkbox"
-                    checked={agentStepByStep}
-                    onChange={(e) => setAgentStepByStep(e.target.checked)}
-                  />
-                  <span>使用分步骤讲解</span>
-                </label>
-              </div>
-            </div>
-
-            <div className="settings-actions">
-              <button className="primary-button" onClick={saveAgentSettings}>
-                保存我的 Agent 设置
-              </button>
-              <button className="secondary-button" onClick={resetAgentSettings}>
-                恢复默认设置
-              </button>
-            </div>
-
-            {agentSaved && <div className="settings-saved">✓ Agent 设置已保存</div>}
+                {settingsSaved && <div className="settings-saved">✓ Agent 设置已保存</div>}
+                {settingsError && <div className="settings-saved" style={{ color: '#c62828' }}>⚠️ {settingsError}</div>}
+              </>
+            )}
           </div>
         </main>
       </div>
