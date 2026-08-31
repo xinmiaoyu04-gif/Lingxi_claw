@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { api, waitForTask, type AgentSettings, type Analysis, type Dataset, type Homework, type HomeworkResult, type Plan } from './api/client'
 import AppShell from './components/AppShell'
 import Home from './pages/Home'
@@ -36,7 +36,11 @@ const modes = [
 ]
 
 function LegacyApp() {
-  const [currentMode, setCurrentMode] = useState('final-sprint')
+  const location = useLocation()
+  const navigate = useNavigate()
+  // URL 作为单一数据源：让 V02 首页「快速入口」能直达对应的功能模式
+  const pathMode = location.pathname.replace(/^\/+/, '')
+  const currentMode = modes.some((m) => m.id === pathMode) ? pathMode : 'final-sprint'
   const current = modes.find((m) => m.id === currentMode) || modes[0]
   const [datasetName, setDatasetName] = useState('高等数学期末突击')
   const [datasetCourse, setDatasetCourse] = useState('高等数学')
@@ -224,7 +228,7 @@ function LegacyApp() {
               <div
                 key={mode.id}
                 className={`sidebar-item ${currentMode === mode.id ? 'active' : ''}`}
-                onClick={() => setCurrentMode(mode.id)}
+                onClick={() => navigate('/' + mode.id)}
               >
                 {mode.label}
               </div>
@@ -435,7 +439,7 @@ function LegacyApp() {
               <div
                 key={mode.id}
                 className={`sidebar-item ${currentMode === mode.id ? 'active' : ''}`}
-                onClick={() => setCurrentMode(mode.id)}
+                onClick={() => navigate('/' + mode.id)}
               >
                 {mode.label}
               </div>
@@ -603,7 +607,7 @@ function LegacyApp() {
               <div
                 key={mode.id}
                 className={`sidebar-item ${currentMode === mode.id ? 'active' : ''}`}
-                onClick={() => setCurrentMode(mode.id)}
+                onClick={() => navigate('/' + mode.id)}
               >
                 {mode.label}
               </div>
@@ -661,7 +665,7 @@ function LegacyApp() {
               <div
                 key={mode.id}
                 className={`sidebar-item ${currentMode === mode.id ? 'active' : ''}`}
-                onClick={() => setCurrentMode(mode.id)}
+                onClick={() => navigate('/' + mode.id)}
               >
                 {mode.label}
               </div>
@@ -764,7 +768,7 @@ function LegacyApp() {
             <div
               key={mode.id}
               className={`sidebar-item ${currentMode === mode.id ? 'active' : ''}`}
-              onClick={() => setCurrentMode(mode.id)}
+              onClick={() => navigate('/' + mode.id)}
             >
               {mode.label}
             </div>
@@ -787,6 +791,10 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Navigate to="/home" replace />} />
+        <Route path="/final-sprint" element={<LegacyApp />} />
+        <Route path="/homework" element={<LegacyApp />} />
+        <Route path="/general-question" element={<LegacyApp />} />
+        <Route path="/agent-settings" element={<LegacyApp />} />
         <Route element={<AppShell />}>
           <Route path="/home" element={<Home />} />
           <Route path="/courses" element={<Courses />} />
